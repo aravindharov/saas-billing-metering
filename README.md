@@ -3,7 +3,7 @@
 A multi-tenant SaaS backend that supports merchants, plans, customer
 subscriptions, usage-event ingestion, aggregation, and invoice generation.
 
-> **Current phase: 0 — Foundation**
+> **Current phase: 1 — Authentication & Tenancy**
 
 ---
 
@@ -81,6 +81,20 @@ docker compose down           # Stop services
 docker compose logs -f        # Tail logs
 docker compose build          # Rebuild images
 ```
+
+---
+
+## Development Credentials
+
+After running `docker compose exec app php artisan db:seed`, the following
+test accounts are available:
+
+| Merchant Slug | Email | Password | Role |
+|---------------|-------|----------|------|
+| `acme` | `owner@acme.test` | `password` | owner |
+| `acme` | `member@acme.test` | `password` | member |
+
+> ⚠️ These are **development-only** credentials. Never use them in production.
 
 ---
 
@@ -203,6 +217,52 @@ GitHub Actions runs two workflows:
 
 ---
 
+## Authentication API
+
+### `POST /api/v1/auth/login`
+
+Authenticate a user within a merchant context.
+
+**Request:**
+```json
+{
+    "merchant": "acme",
+    "email": "owner@acme.test",
+    "password": "password"
+}
+```
+
+**Response (200):**
+```json
+{
+    "user": { "id": "01J...", "name": "Acme Owner", "email": "owner@acme.test", "role": "owner" },
+    "merchant": { "id": "01J...", "name": "Acme Corporation", "slug": "acme" },
+    "token": "1|abc..."
+}
+```
+
+**Errors:** `401` invalid credentials, `422` validation errors, `429` rate limited.
+
+### `POST /api/v1/auth/logout`
+
+Revoke the current authentication token. Requires `Authorization: Bearer <token>`.
+
+**Response (200):** `{ "message": "Logged out." }`
+
+### `GET /api/v1/auth/me`
+
+Return the current authenticated user and merchant. Requires `Authorization: Bearer <token>`.
+
+**Response (200):**
+```json
+{
+    "user": { "id": "01J...", "name": "Acme Owner", "email": "owner@acme.test", "role": "owner" },
+    "merchant": { "id": "01J...", "name": "Acme Corporation", "slug": "acme" }
+}
+```
+
+---
+
 ## Architecture Principles
 
 - **Thin controllers** — Business logic lives in Actions/Services, not controllers.
@@ -217,28 +277,44 @@ GitHub Actions runs two workflows:
 
 ## Implementation Status
 
-### ✅ Implemented (Phase 0)
+### ✅ Implemented (Phase 0 — Foundation)
 
 - [x] Fresh Laravel 13 project
 - [x] Docker Compose (app, queue, scheduler, MySQL, Redis, Vite)
 - [x] MySQL 8.4 with test database
 - [x] Redis 7.4 for cache and queues
-- [x] Laravel Sanctum for API auth (configured, not yet wired to endpoints)
 - [x] Health check endpoint (`GET /api/health`)
 - [x] SPA shell (Vue 3 + TypeScript + Tailwind)
-- [x] Vue Router with default layout
-- [x] API client foundation (Axios)
-- [x] PHPUnit test infrastructure
-- [x] Vitest test infrastructure
-- [x] Larastan static analysis
-- [x] Pint code style
-- [x] ESLint + Prettier
-- [x] GitHub Actions CI (lint, analyse, type-check, build, tests)
+- [x] PHPUnit + Vitest test infrastructure
+- [x] Larastan, Pint, ESLint, Prettier
+- [x] GitHub Actions CI
 - [x] Makefile shortcuts
+
+### ✅ Implemented (Phase 1 — Authentication & Tenancy)
+
+- [x] Merchant model with ULID public IDs, slug, status
+- [x] User model with merchant relationship, role (owner/member)
+- [x] Per-merchant email uniqueness (tenant-local identity)
+- [x] Laravel Sanctum token authentication
+- [x] `POST /api/v1/auth/login` — authenticate by merchant slug + email + password
+- [x] `POST /api/v1/auth/logout` — revoke current token
+- [x] `GET /api/v1/auth/me` — current user + merchant context
+- [x] `MerchantContext` — tenant resolution from authenticated identity
+- [x] `ResolveMerchant` middleware — enforces tenant context on protected routes
+- [x] Opaque auth error responses (no credential leakage)
+- [x] Suspended merchant blocking
+- [x] Login rate limiting (5 attempts/minute)
+- [x] Vue login page with merchant/email/password form
+- [x] Auth composable with reactive state management
+- [x] Vue Router guards (protected routes + guest routes)
+- [x] Authenticated layout with merchant name, user, role, logout
+- [x] Database factories (Merchant, User with owner/member states)
+- [x] Development seeder (Acme Corporation with owner + member)
+- [x] 49 backend tests (121 assertions)
+- [x] 9 frontend tests
 
 ### 🔲 Planned
 
-- [ ] Merchant tenancy & authentication
 - [ ] Plans & pricing
 - [ ] Customer subscriptions
 - [ ] Usage event ingestion (high-volume, idempotent)

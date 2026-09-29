@@ -24,6 +24,11 @@ export default tseslint.config(
             'vue/multi-word-component-names': 'off',
             'vue/html-indent': ['warn', 4],
             'vue/singleline-html-element-content-newline': 'off',
+            'vue/max-attributes-per-line': 'off',
+            'vue/html-self-closing': [
+                'warn',
+                { html: { void: 'any', normal: 'always', component: 'always' } },
+            ],
             '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
         },
     },
