@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Usage;
 
+use App\Jobs\AggregateDailyUsage;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Subscription;
@@ -52,6 +53,12 @@ final class RecordUsageEvent
             $event->quantity = $quantity;
             $event->occurred_at = $occurredAt;
             $event->save();
+
+            AggregateDailyUsage::dispatch(
+                $merchant->id,
+                $customer->id,
+                $occurredAt->copy()->utc()->format('Y-m-d'),
+            )->afterCommit();
 
             return [$event, true];
         } catch (UniqueConstraintViolationException) {

@@ -31,6 +31,12 @@
                         >
                             Subscriptions
                         </router-link>
+                        <router-link
+                            :to="{ name: 'usage.daily' }"
+                            class="text-gray-600 hover:text-gray-900"
+                        >
+                            Usage
+                        </router-link>
                     </nav>
                 </div>
                 <div v-if="user" class="flex items-center gap-4 text-sm">

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DailyUsageController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -45,5 +46,8 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         Route::post('/usage', [UsageController::class, 'store'])
             ->middleware('throttle:usage-ingest')
             ->name('usage.store');
+
+        Route::get('/usage/daily', [DailyUsageController::class, 'index'])
+            ->name('usage.daily');
     });
 });

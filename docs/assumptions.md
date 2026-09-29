@@ -90,3 +90,19 @@ reader might question.
 | 11 | **Subscription validation at ingest time** | The subscription must be active and belong to the customer. However, `occurred_at` may predate the current subscription period (late events). Billing-period matching is deferred to the aggregation/billing phase. |
 | 12 | **No event type/category dimension** | The assignment describes generic "usage units." Adding event types would complicate the schema without clear requirements. Can be added later if needed. |
 | 13 | **`UniqueConstraintViolationException` catch for race conditions** | Two concurrent requests with the same `event_id` can both pass the existence check. The INSERT's unique constraint violation is caught and the existing record returned, guaranteeing exactly-once semantics. |
+
+## Phase 6 — Daily Usage Aggregation
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **`daily_usage` is a derived read model** | Raw `usage_events` remain the sole source of truth. Aggregates can be dropped and rebuilt via `usage:aggregate` without data loss. |
+| 2 | **Recalculate with SUM, never increment** | Queue retries must not use `+=`. Each job run queries `SUM(quantity)` and SETs `total_quantity`, making aggregation idempotent. |
+| 3 | **UTC calendar day from `occurred_at`** | Usage date uses `[day_start, day_start + 1 day)` in UTC. `created_at` is ignored for bucketing. |
+| 4 | **Upsert via database** | `DB::table()->upsert()` with unique key `(merchant_id, customer_id, usage_date)` handles concurrent jobs safely. |
+| 5 | **No row for zero usage** | Avoids millions of zero rows. When SUM is 0, delete any stale aggregate row. |
+| 6 | **Job dispatched after commit** | Ensures the worker never aggregates an event that rolled back. Only new inserts dispatch; idempotent retries do not. |
+| 7 | **Rebuild uses SQL GROUP BY + chunk** | `usage:aggregate` never loads all events into PHP. Distinct merchant/customer/date tuples are chunked (500) and one job dispatched per tuple. |
+| 8 | **No public_id on daily_usage** | Internal read model; API exposes customer public_id and usage_date only. |
+| 9 | **API date range capped at 366 days** | Prevents unbounded read queries. Default listing window is 31 days when no filter is provided. |
+| 10 | **No billing in aggregation** | This phase sums quantities only. Pricing, overage, and invoices belong to later phases. |
+| 11 | **Partitioning still deferred** | Same rationale as Phase 5 — indexes + async aggregation suffice until operational metrics justify partition complexity. |
