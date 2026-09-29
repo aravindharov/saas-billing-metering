@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Actions\Usage;
 
+use App\Jobs\AggregateDailyUsage;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Subscription;
 use App\Models\UsageEvent;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class RecordUsageEvent
@@ -44,16 +46,31 @@ final class RecordUsageEvent
 
         // Attempt insert — the UNIQUE constraint catches any race.
         try {
-            $event = new UsageEvent;
-            $event->merchant_id = $merchant->id;
-            $event->customer_id = $customer->id;
-            $event->subscription_id = $subscription->id;
-            $event->event_id = $eventId;
-            $event->quantity = $quantity;
-            $event->occurred_at = $occurredAt;
-            $event->save();
+            return DB::transaction(function () use (
+                $merchant,
+                $customer,
+                $subscription,
+                $eventId,
+                $quantity,
+                $occurredAt,
+            ): array {
+                $event = new UsageEvent;
+                $event->merchant_id = $merchant->id;
+                $event->customer_id = $customer->id;
+                $event->subscription_id = $subscription->id;
+                $event->event_id = $eventId;
+                $event->quantity = $quantity;
+                $event->occurred_at = $occurredAt;
+                $event->save();
 
-            return [$event, true];
+                AggregateDailyUsage::dispatch(
+                    $merchant->id,
+                    $customer->id,
+                    $occurredAt->copy()->utc()->format('Y-m-d'),
+                )->afterCommit();
+
+                return [$event->refresh(), true];
+            });
         } catch (UniqueConstraintViolationException) {
             // Concurrent duplicate — return the existing record.
             $existing = UsageEvent::where('merchant_id', $merchant->id)

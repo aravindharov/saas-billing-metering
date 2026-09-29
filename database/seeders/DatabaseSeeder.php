@@ -6,6 +6,7 @@ namespace Database\Seeders;
 
 use App\Actions\Subscriptions\CreateSubscription;
 use App\Enums\BillingCycle;
+use App\Jobs\AggregateDailyUsage;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Plan;
@@ -94,6 +95,7 @@ final class DatabaseSeeder extends Seeder
         $now = Carbon::now();
 
         for ($i = 0; $i < 5; $i++) {
+            $occurredAt = $now->copy()->subDays($i);
             UsageEvent::factory()
                 ->forMerchant($merchant)
                 ->forCustomer($customer)
@@ -101,8 +103,14 @@ final class DatabaseSeeder extends Seeder
                 ->create([
                     'event_id' => 'evt_seed_'.str_pad((string) ($i + 1), 5, '0', STR_PAD_LEFT),
                     'quantity' => ($i + 1) * 10,
-                    'occurred_at' => $now->copy()->subDays($i),
+                    'occurred_at' => $occurredAt,
                 ]);
+
+            AggregateDailyUsage::dispatchSync(
+                $merchant->id,
+                $customer->id,
+                $occurredAt->copy()->utc()->format('Y-m-d'),
+            );
         }
     }
 }

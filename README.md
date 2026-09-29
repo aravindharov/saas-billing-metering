@@ -3,7 +3,7 @@
 A multi-tenant SaaS backend that supports merchants, plans, customer
 subscriptions, usage-event ingestion, aggregation, and invoice generation.
 
-> **Current phase: 5 — Usage Event Ingestion**
+> **Current phase: 6 — Daily Usage Aggregation**
 
 ---
 
@@ -173,9 +173,15 @@ docker compose exec app npm run test:coverage
 ## Queue Commands
 
 ```bash
-# The queue worker runs automatically as the `queue` Docker service.
-# To process jobs manually:
+# The `queue` Docker service runs `queue:work` in a restart loop (see docker-compose.yml).
+# Ensure it is up:
+docker compose up -d queue
+
+# To process jobs manually (one-off):
 docker compose exec app php artisan queue:work redis --queue=high,default
+
+# Jobs run inline without a worker (simple local dev only):
+# QUEUE_CONNECTION=sync in .env
 
 # Monitor failed jobs
 docker compose exec app php artisan queue:failed
@@ -565,7 +571,78 @@ All date-composite indexes are append-oriented: new events go to the end of the 
 
 ### Queue Boundary
 
-After successful insertion, raw events are the durable source of truth. In Phase 6, a `UsageEventRecorded` event or job will be dispatched to trigger asynchronous daily aggregation. The ingestion path never performs synchronous aggregation, totaling, or billing calculation.
+After a new usage event is committed, `AggregateDailyUsage` is dispatched **after commit** with the merchant, customer, and UTC usage date derived from `occurred_at`. Idempotent ingestion retries do not dispatch duplicate jobs. The HTTP ingestion path never performs synchronous aggregation.
+
+---
+
+## Daily Usage Aggregation
+
+`usage_events` is the **source of truth**. `daily_usage` is a **derived read model** that can be deleted and rebuilt entirely from raw events.
+
+### Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `merchant_id` | FK | Tenant boundary |
+| `customer_id` | FK | Customer whose usage was aggregated |
+| `usage_date` | date (UTC) | Calendar day derived from `occurred_at`, not `created_at` |
+| `total_quantity` | unsigned bigint | `SUM(quantity)` for that merchant/customer/day |
+
+**Constraint:** `UNIQUE(merchant_id, customer_id, usage_date)` — one row per customer per UTC day.
+
+**Indexes:** The unique constraint covers customer/day lookups. An additional `(merchant_id, usage_date)` index supports merchant-wide date-range queries.
+
+**No row = no usage** — zero-quantity days are not stored.
+
+### Aggregation Algorithm (Idempotent)
+
+For each `(merchant_id, customer_id, usage_date)`:
+
+1. UTC day start = `usage_date 00:00:00`
+2. UTC day end = start + 1 day (exclusive)
+3. `total = SUM(quantity)` from `usage_events` in that window
+4. If `total > 0`: upsert `daily_usage` with `total_quantity = total` (SET, never `+=`)
+5. If `total = 0`: delete any existing `daily_usage` row for that key
+
+Running the same job twice, retrying after failure, or running concurrent jobs for the same key always yields the same total — no double-counting.
+
+### Queue Architecture
+
+```
+POST /api/v1/usage (Phase 5)
+        ↓
+usage_events persisted
+        ↓
+AggregateDailyUsage dispatched (after commit)
+        ↓
+Laravel queue worker
+        ↓
+daily_usage upsert
+```
+
+### Historical Rebuild
+
+```bash
+php artisan usage:aggregate --from=2026-09-01 --to=2026-09-30
+```
+
+Finds distinct `(merchant_id, customer_id, DATE(occurred_at))` combinations in the range using database-side `GROUP BY`, dispatches one job per combination in chunks of 500. Safe to run repeatedly.
+
+### Daily Usage API
+
+`GET /api/v1/usage/daily` — read-only, tenant-scoped, paginated (50/page).
+
+| Query param | Description |
+|-------------|-------------|
+| `date` | Exact UTC usage date (`Y-m-d`) |
+| `from` / `to` | Inclusive range (max 366 days) |
+| `customer_id` | Filter by customer public ID |
+
+Default (no filters): last 31 days only — prevents unbounded queries.
+
+### Authorization
+
+Both owners and members may view daily usage (`viewDailyUsage` on `UsageEventPolicy`), consistent with Phase 5 ingest permissions.
 
 ---
 
@@ -576,9 +653,11 @@ The architecture separates **write-optimized ingestion** from **read-optimized a
 ```
 Raw Usage Events (append-only, indexed)
         ↓
-Asynchronous Queue (Phase 6)
+Asynchronous Queue
         ↓
-Daily Usage Aggregates (read model, Phase 6)
+Chunked AggregateDailyUsage jobs
+        ↓
+daily_usage (rebuildable read model)
         ↓
 Dashboard / Billing reads
 ```
@@ -588,7 +667,9 @@ Dashboard / Billing reads
 - **Append-only writes** — no UPDATE/DELETE, minimizing lock contention.
 - **Composite indexes** — optimized for the expected query patterns without over-indexing.
 - **Idempotency at the database level** — `UNIQUE(merchant_id, event_id)` prevents duplicates without application-level locks.
-- **Lightweight ingestion** — no aggregation, no billing calculation in the request path.
+- **Lightweight ingestion** — aggregation runs asynchronously via queued jobs.
+- **Rebuildable read model** — `daily_usage` is disposable; `usage:aggregate` recomputes from raw events.
+- **Database-side grouping** — rebuild command never loads all raw events into PHP memory.
 
 ### When to Scale Further
 
@@ -784,6 +865,12 @@ Implemented via Laravel Policy (`SubscriptionPolicy`).
 
 Both owners and members can ingest usage because this endpoint is intended for machine-to-machine calls from the merchant's backend systems. Implemented via `UsageEventPolicy`.
 
+| Action | Owner | Member |
+|--------|-------|--------|
+| View daily usage | ✅ | ✅ |
+
+Implemented via `UsageEventPolicy::viewDailyUsage`.
+
 ---
 
 ## Architecture Principles
@@ -929,10 +1016,24 @@ Both owners and members can ingest usage because this endpoint is intended for m
 - [x] 38 backend tests across 5 test files
 - [x] 50L+ scaling strategy documented
 
+### ✅ Implemented (Phase 6 — Daily Usage Aggregation)
+
+- [x] `daily_usage` table with `UNIQUE(merchant_id, customer_id, usage_date)`
+- [x] DailyUsage model (internal read model, no public API id)
+- [x] `AggregateDailyUsage` queued job — SUM from raw events, upsert SET total
+- [x] Idempotent aggregation — retries and concurrent jobs cannot double-count
+- [x] UTC usage date from `occurred_at` (half-open day window)
+- [x] Late events recompute the affected UTC date only
+- [x] Job dispatched after commit on new usage events only
+- [x] `php artisan usage:aggregate --from --to` rebuild with chunked GROUP BY
+- [x] `GET /api/v1/usage/daily` — date, range (max 366 days), customer filter, pagination
+- [x] Tenant isolation via MerchantContext
+- [x] Vue Daily Usage page (date filter, table, pagination)
+- [x] 30+ backend tests (aggregation, idempotency, late events, API, command)
+- [x] 50L+ architecture documentation updated
+
 ### 🔲 Planned
 
-- [ ] Daily usage aggregation (queued, async)
-- [ ] Usage aggregation (queued, chunked)
 - [ ] Billing & invoice generation
 - [ ] Proration for plan changes
 - [ ] Rate limiting on ingestion endpoints

@@ -19,4 +19,12 @@ final class UsageEventPolicy
     {
         return true;
     }
+
+    /**
+     * Any authenticated user within the merchant can view daily usage.
+     */
+    public function viewDailyUsage(User $user): bool
+    {
+        return true;
+    }
 }

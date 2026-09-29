@@ -64,6 +64,20 @@ const routes: RouteRecordRaw[] = [
                 name: 'subscriptions.show',
                 component: () => import('@/pages/SubscriptionDetailPage.vue'),
             },
+            {
+                path: 'usage',
+                redirect: { name: 'usage.daily' },
+            },
+            {
+                path: 'usage/daily',
+                name: 'usage.daily',
+                component: () => import('@/pages/DailyUsagePage.vue'),
+            },
+            {
+                path: 'usage/record',
+                name: 'usage.record',
+                component: () => import('@/pages/RecordUsagePage.vue'),
+            },
         ],
     },
 ];
