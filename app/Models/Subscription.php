@@ -107,6 +107,12 @@ class Subscription extends Model
         return $this->hasMany(SubscriptionPlanChange::class)->orderBy('effective_at');
     }
 
+    /** @return HasMany<UsageEvent, $this> */
+    public function usageEvents(): HasMany
+    {
+        return $this->hasMany(UsageEvent::class);
+    }
+
     public function getRouteKeyName(): string
     {
         return 'public_id';

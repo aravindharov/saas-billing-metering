@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\UsageController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -40,5 +41,9 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             ->name('subscriptions.change-plan');
         Route::post('/subscriptions/{subscription}/cancel', [SubscriptionController::class, 'cancel'])
             ->name('subscriptions.cancel');
+
+        Route::post('/usage', [UsageController::class, 'store'])
+            ->middleware('throttle:usage-ingest')
+            ->name('usage.store');
     });
 });

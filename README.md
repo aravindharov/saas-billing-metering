@@ -3,7 +3,7 @@
 A multi-tenant SaaS backend that supports merchants, plans, customer
 subscriptions, usage-event ingestion, aggregation, and invoice generation.
 
-> **Current phase: 4 — Subscriptions & Plan Changes**
+> **Current phase: 5 — Usage Event Ingestion**
 
 ---
 
@@ -459,6 +459,156 @@ Cancel an active subscription. **Owner only.** Sets status to `cancelled` and re
 
 ---
 
+## Usage Ingestion API
+
+### `POST /api/v1/usage`
+
+Record a usage event. Requires `Authorization: Bearer <token>`. Any authenticated user (owner or member) may ingest usage. Rate limited to 500 requests/minute per merchant.
+
+**Request:**
+```json
+{
+    "event_id": "evt_10001",
+    "customer_id": "01J...",
+    "subscription_id": "01J...",
+    "quantity": 25,
+    "occurred_at": "2026-09-29T14:30:00Z"
+}
+```
+
+**Response (201 — new event):**
+```json
+{
+    "data": {
+        "id": "01J...",
+        "event_id": "evt_10001",
+        "customer": { "id": "01J...", "name": "John Smith" },
+        "subscription": { "id": "01J..." },
+        "quantity": 25,
+        "occurred_at": "2026-09-29T14:30:00+00:00",
+        "created_at": "2026-09-29T15:00:00+00:00"
+    }
+}
+```
+
+**Response (200 — idempotent retry):** Returns the existing event unchanged. No duplicate record is created.
+
+**Validation:**
+- `event_id` — required, string, max 255, unique per merchant (idempotency key)
+- `customer_id` — required, must belong to merchant, must be active
+- `subscription_id` — required, must belong to merchant and customer, must be active
+- `quantity` — required, integer, 1–1,000,000
+- `occurred_at` — required, ISO-8601, stored in UTC, must not be > 5 minutes in the future
+
+**Errors:** `401` unauthorized, `422` validation, `429` rate limited.
+
+**No update or delete endpoints exist.** Usage events are immutable source-of-truth records.
+
+---
+
+## Usage Event Design
+
+### Event Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event_id` | string | Client-generated idempotency key, unique per merchant |
+| `customer_id` | FK | Customer who generated the usage |
+| `subscription_id` | FK | Active subscription at time of usage |
+| `quantity` | unsigned int | Usage units consumed (always positive integer) |
+| `occurred_at` | datetime (UTC) | When the usage actually occurred |
+
+### Idempotency
+
+The `UNIQUE(merchant_id, event_id)` database constraint is the **final authority** against duplicates. The flow is:
+
+1. Check if `event_id` already exists for the merchant (fast path).
+2. If yes → return existing event with HTTP 200.
+3. If no → attempt INSERT.
+4. If `UniqueConstraintViolationException` (concurrent race) → return existing event with HTTP 200.
+
+Clients can safely retry after network timeouts, connection resets, or temporary errors. The same `event_id` always resolves to the same event.
+
+### Timestamp Handling
+
+- All timestamps are stored in UTC regardless of the input timezone.
+- `occurred_at` is the client-provided occurrence time, not the server receipt time.
+- Events with `occurred_at` up to 5 minutes in the future are accepted (clock-skew tolerance).
+- Events further in the future are rejected.
+
+### Late Events
+
+Late-arriving usage events are accepted. If `occurred_at` is in the past (e.g., days or weeks ago), the event is still recorded as long as the customer and subscription are currently valid. Future aggregation phases must be capable of recomputing affected daily totals when late events arrive.
+
+### Immutability
+
+Raw usage events are **never edited or deleted** through the API. They are the source of truth for all downstream billing and aggregation. If incorrect usage must be corrected, a compensating event (negative or correction) would be the future approach rather than mutating historical data.
+
+### Rate Limiting
+
+| Scope | Limit | Window |
+|-------|-------|--------|
+| Per merchant | 500 requests | 1 minute |
+
+Scoped by `merchant_id` so one merchant's traffic cannot consume another's quota. Returns HTTP 429 with `Retry-After` header when exceeded.
+
+### Indexing Strategy
+
+| Index | Purpose | Write Impact |
+|-------|---------|-------------|
+| `UNIQUE(merchant_id, event_id)` | Idempotency enforcement | Moderate — checked on every insert |
+| `(customer_id, occurred_at)` | Per-customer usage lookups & future aggregation | Low — append-oriented |
+| `(subscription_id, occurred_at)` | Per-subscription billing queries | Low — append-oriented |
+| `(merchant_id, occurred_at)` | Merchant-wide usage queries & dashboard | Low — append-oriented |
+
+All date-composite indexes are append-oriented: new events go to the end of the B-tree leaf chain, minimizing page splits and keeping write amplification low.
+
+### Queue Boundary
+
+After successful insertion, raw events are the durable source of truth. In Phase 6, a `UsageEventRecorded` event or job will be dispatched to trigger asynchronous daily aggregation. The ingestion path never performs synchronous aggregation, totaling, or billing calculation.
+
+---
+
+## Scaling Usage Events Beyond 50L Rows
+
+The architecture separates **write-optimized ingestion** from **read-optimized aggregation**:
+
+```
+Raw Usage Events (append-only, indexed)
+        ↓
+Asynchronous Queue (Phase 6)
+        ↓
+Daily Usage Aggregates (read model, Phase 6)
+        ↓
+Dashboard / Billing reads
+```
+
+### Current Implementation
+
+- **Append-only writes** — no UPDATE/DELETE, minimizing lock contention.
+- **Composite indexes** — optimized for the expected query patterns without over-indexing.
+- **Idempotency at the database level** — `UNIQUE(merchant_id, event_id)` prevents duplicates without application-level locks.
+- **Lightweight ingestion** — no aggregation, no billing calculation in the request path.
+
+### When to Scale Further
+
+| Threshold | Action |
+|-----------|--------|
+| ~10L rows | Current indexes + async aggregation sufficient |
+| ~50L rows | Consider MySQL `RANGE` partitioning by `occurred_at` month |
+| ~100L+ rows | Evaluate time-series storage, archive cold partitions, or shard by merchant |
+
+### Partitioning Strategy (Not Yet Implemented)
+
+MySQL `RANGE` partitioning by `occurred_at` month would:
+- Keep hot partitions (current + recent months) small and fast
+- Allow efficient partition pruning for date-range queries
+- Enable `ALTER TABLE DROP PARTITION` for archival
+
+**Not implemented now** because: (1) the current index set handles the expected scale; (2) partitioning requires all unique constraints to include the partition key, which would change the idempotency constraint from `UNIQUE(merchant_id, event_id)` to `UNIQUE(merchant_id, event_id, occurred_at)` — adding complexity for a scale problem that doesn't yet exist.
+
+---
+
 ## Subscription Design
 
 ### Pricing Snapshots
@@ -626,6 +776,14 @@ Implemented via Laravel Policy (`CustomerPolicy`).
 
 Implemented via Laravel Policy (`SubscriptionPolicy`).
 
+### Usage Permissions
+
+| Action | Owner | Member |
+|--------|-------|--------|
+| Ingest usage event | ✅ | ✅ |
+
+Both owners and members can ingest usage because this endpoint is intended for machine-to-machine calls from the merchant's backend systems. Implemented via `UsageEventPolicy`.
+
 ---
 
 ## Architecture Principles
@@ -747,9 +905,33 @@ Implemented via Laravel Policy (`SubscriptionPolicy`).
 - [x] Backend tests: create, list, show, change plan, cancel, model, tenant isolation
 - [x] Frontend tests
 
+### ✅ Implemented (Phase 5 — Usage Event Ingestion)
+
+- [x] UsageEvent model with ULID public IDs, tenant scoping
+- [x] `POST /api/v1/usage` — ingest usage event (any authenticated user)
+- [x] Client-generated `event_id` as idempotency key
+- [x] `UNIQUE(merchant_id, event_id)` database constraint — final authority against duplicates
+- [x] Idempotent retry: duplicate `event_id` returns existing event (HTTP 200), no duplicate record
+- [x] Concurrent duplicate protection via `UniqueConstraintViolationException` catch
+- [x] Customer validation: must exist, belong to merchant, be active
+- [x] Subscription validation: must exist, belong to merchant and customer, be active
+- [x] UTC timestamp storage, ISO-8601 input, timezone normalization
+- [x] Late event support: historical `occurred_at` accepted
+- [x] Future event rejection: > 5 minutes clock-skew tolerance
+- [x] Quantity: positive integer, 1–1,000,000
+- [x] Merchant-scoped rate limiting: 500 requests/minute per merchant (HTTP 429)
+- [x] Immutable events: no PUT/PATCH/DELETE endpoints
+- [x] Lightweight write path: no synchronous aggregation or billing
+- [x] Indexes optimized for high write volume and future aggregation queries
+- [x] UsageEventPolicy for authorization
+- [x] Database factory with merchant/customer/subscription/historical states
+- [x] Development seeder (5 sample usage events for John Smith)
+- [x] 38 backend tests across 5 test files
+- [x] 50L+ scaling strategy documented
+
 ### 🔲 Planned
 
-- [ ] Usage event ingestion (high-volume, idempotent)
+- [ ] Daily usage aggregation (queued, async)
 - [ ] Usage aggregation (queued, chunked)
 - [ ] Billing & invoice generation
 - [ ] Proration for plan changes
