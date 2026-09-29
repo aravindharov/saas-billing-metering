@@ -44,3 +44,15 @@ reader might question.
 | 7 | **Pricing snapshots deferred** | Editing a plan's price changes it immediately. When subscriptions are introduced, a pricing snapshot mechanism will preserve the price applicable at subscription time. |
 | 8 | **Cache scoped by merchant_id** | Cache keys include `merchant_id` to guarantee tenant isolation. Keys are invalidated on every write (create, update, archive). |
 | 9 | **No billing calculations** | This phase establishes pricing data only. Billing, invoicing, and overage calculations belong to future phases. |
+
+## Phase 3 — Customers
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **Soft-delete via status** | `DELETE /customers/{id}` sets status to `inactive` instead of physically deleting. Customers will be referenced by future subscriptions, usage, and invoices. |
+| 2 | **External reference optional, unique per merchant** | `UNIQUE(merchant_id, external_reference)` with nullable — allows merchants to link customers to external CRM/account systems. Different merchants can use the same reference. |
+| 3 | **Email not unique** | Multiple customers under the same merchant can share an email address. Uniqueness is enforced on `external_reference` instead. |
+| 4 | **Search via LIKE queries** | Simple `LIKE %search%` on name/email/external_reference. Sufficient for the current scale. A full-text search engine can be added later if needed. |
+| 5 | **No subscriptions or billing** | Customers are standalone entities in this phase. Subscription assignment belongs to Phase 4. |
+| 6 | **Tenant-scoped route model binding** | Same pattern as Plan — `Customer::resolveRouteBinding` scopes to the authenticated merchant. Cross-tenant → 404. |
+| 7 | **Indexes for query patterns** | `(merchant_id, status)` for filtered listing, `(merchant_id, email)` for email lookups, `UNIQUE(merchant_id, external_reference)` for reference lookups. |

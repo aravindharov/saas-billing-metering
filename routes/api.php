@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PlanController;
 use Illuminate\Support\Facades\Route;
@@ -31,5 +32,6 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
 
         Route::apiResource('plans', PlanController::class);
+        Route::apiResource('customers', CustomerController::class);
     });
 });

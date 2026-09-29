@@ -63,6 +63,12 @@ class Merchant extends Model
         return $this->hasMany(Plan::class);
     }
 
+    /** @return HasMany<Customer, $this> */
+    public function customers(): HasMany
+    {
+        return $this->hasMany(Customer::class);
+    }
+
     public function getRouteKeyName(): string
     {
         return 'public_id';
