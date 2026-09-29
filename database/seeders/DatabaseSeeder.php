@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Actions\Subscriptions\CreateSubscription;
-use App\Jobs\AggregateDailyUsage;
 use App\Enums\BillingCycle;
+use App\Jobs\AggregateDailyUsage;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Plan;
