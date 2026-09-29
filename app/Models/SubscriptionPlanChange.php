@@ -9,6 +9,7 @@ use Database\Factories\SubscriptionPlanChangeFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -16,7 +17,7 @@ use Illuminate\Support\Str;
  * @property int $subscription_id
  * @property int $from_plan_id
  * @property int $to_plan_id
- * @property \Illuminate\Support\Carbon $effective_at
+ * @property Carbon $effective_at
  * @property int $from_base_price
  * @property int $from_included_usage_units
  * @property int $from_overage_rate

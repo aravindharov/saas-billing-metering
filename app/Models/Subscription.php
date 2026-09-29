@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -20,14 +21,14 @@ use Illuminate\Support\Str;
  * @property int $customer_id
  * @property int $plan_id
  * @property SubscriptionStatus $status
- * @property \Illuminate\Support\Carbon $started_at
- * @property \Illuminate\Support\Carbon $current_period_start
- * @property \Illuminate\Support\Carbon $current_period_end
+ * @property Carbon $started_at
+ * @property Carbon $current_period_start
+ * @property Carbon $current_period_end
  * @property BillingCycle $billing_cycle
  * @property int $base_price
  * @property int $included_usage_units
  * @property int $overage_rate
- * @property \Illuminate\Support\Carbon|null $cancelled_at
+ * @property Carbon|null $cancelled_at
  */
 class Subscription extends Model
 {

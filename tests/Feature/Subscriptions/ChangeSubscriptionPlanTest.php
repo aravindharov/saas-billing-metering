@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Subscriptions;
 
-use App\Enums\BillingCycle;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Plan;
