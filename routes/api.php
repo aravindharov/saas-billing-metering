@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PlanController;
+use App\Http\Controllers\Api\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -33,5 +34,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
         Route::apiResource('plans', PlanController::class);
         Route::apiResource('customers', CustomerController::class);
+
+        Route::apiResource('subscriptions', SubscriptionController::class)->only(['index', 'store', 'show']);
+        Route::post('/subscriptions/{subscription}/change-plan', [SubscriptionController::class, 'changePlan'])
+            ->name('subscriptions.change-plan');
+        Route::post('/subscriptions/{subscription}/cancel', [SubscriptionController::class, 'cancel'])
+            ->name('subscriptions.cancel');
     });
 });

@@ -25,6 +25,12 @@
                         >
                             Customers
                         </router-link>
+                        <router-link
+                            :to="{ name: 'subscriptions.index' }"
+                            class="text-gray-600 hover:text-gray-900"
+                        >
+                            Subscriptions
+                        </router-link>
                     </nav>
                 </div>
                 <div v-if="user" class="flex items-center gap-4 text-sm">

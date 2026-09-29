@@ -49,6 +49,21 @@ const routes: RouteRecordRaw[] = [
                 name: 'customers.edit',
                 component: () => import('@/pages/CustomerFormPage.vue'),
             },
+            {
+                path: 'subscriptions',
+                name: 'subscriptions.index',
+                component: () => import('@/pages/SubscriptionsPage.vue'),
+            },
+            {
+                path: 'subscriptions/create',
+                name: 'subscriptions.create',
+                component: () => import('@/pages/CreateSubscriptionPage.vue'),
+            },
+            {
+                path: 'subscriptions/:id',
+                name: 'subscriptions.show',
+                component: () => import('@/pages/SubscriptionDetailPage.vue'),
+            },
         ],
     },
 ];

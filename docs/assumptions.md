@@ -56,3 +56,19 @@ reader might question.
 | 5 | **No subscriptions or billing** | Customers are standalone entities in this phase. Subscription assignment belongs to Phase 4. |
 | 6 | **Tenant-scoped route model binding** | Same pattern as Plan — `Customer::resolveRouteBinding` scopes to the authenticated merchant. Cross-tenant → 404. |
 | 7 | **Indexes for query patterns** | `(merchant_id, status)` for filtered listing, `(merchant_id, email)` for email lookups, `UNIQUE(merchant_id, external_reference)` for reference lookups. |
+
+## Phase 4 — Subscriptions & Plan Changes
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **Pricing snapshot at subscription time** | Plan pricing is copied into the subscription row at creation. Editing the plan later does not affect existing subscriptions. This ensures billing integrity. |
+| 2 | **Plan change history with full from/to pricing** | `subscription_plan_changes` records preserve the exact pricing before and after each change. This supports future proration calculations without relying on plan edit history. |
+| 3 | **One active subscription per customer** | Enforced via DB query + row lock. A customer must cancel before subscribing to a new plan. Simplifies billing and avoids conflicting active subscriptions. |
+| 4 | **Row-level locks for concurrency** | `lockForUpdate()` on customer (for creation) and subscription (for changes/cancellation) prevents race conditions in concurrent requests. |
+| 5 | **Calendar-aware periods** | `addMonth()` / `addYear()` rather than fixed 30/365 days. January 31 → February 28 is handled by Carbon. |
+| 6 | **No proration calculation** | Plan changes update the pricing snapshot immediately. Actual proration (billing calculation) is deferred to a future phase. The historical pricing segments support it. |
+| 7 | **No period renewal** | Period renewal (advancing `current_period_start`/`current_period_end`) will be implemented with billing in a future phase. |
+| 8 | **Cancelled subscriptions keep their data** | Cancellation sets status and timestamp but preserves all pricing and period data for historical reference. |
+| 9 | **Effective timestamp on plan changes** | `effective_at` records the exact moment of each plan change, enabling precise proration windows. |
+| 10 | **Subscription belongs to plan (FK)** | The `plan_id` on a subscription tracks the current plan. Historical plan references are preserved in `subscription_plan_changes`. |
+| 11 | **No usage/billing/invoicing** | This phase creates the subscription lifecycle only. Usage ingestion, aggregation, overage calculation, and invoicing belong to future phases. |

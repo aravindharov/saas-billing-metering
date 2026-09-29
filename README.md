@@ -3,7 +3,7 @@
 A multi-tenant SaaS backend that supports merchants, plans, customer
 subscriptions, usage-event ingestion, aggregation, and invoice generation.
 
-> **Current phase: 1 — Authentication & Tenancy**
+> **Current phase: 4 — Subscriptions & Plan Changes**
 
 ---
 
@@ -367,7 +367,145 @@ Update a customer. **Owner only.** Supports partial updates.
 
 ### `DELETE /api/v1/customers/{customer}`
 
-Deactivate a customer (soft-delete). **Owner only.** The customer is set to `inactive` status and remains in the database for historical reference by future subscriptions/invoices.
+Deactivate a customer (soft-delete). **Owner only.** The customer is set to `inactive` status and remains in the database for historical reference by subscriptions/invoices.
+
+---
+
+## Subscriptions API
+
+All subscription endpoints require `Authorization: Bearer <token>` and operate within the authenticated merchant's tenant scope.
+
+### `POST /api/v1/subscriptions`
+
+Create a new subscription. **Owner only.** Snapshots the plan's current pricing into the subscription at creation time.
+
+**Request:**
+```json
+{
+    "customer_id": "01J...",
+    "plan_id": "01J..."
+}
+```
+
+**Response (201):**
+```json
+{
+    "data": {
+        "id": "01J...",
+        "customer": { "id": "01J...", "name": "John Smith" },
+        "plan": { "id": "01J...", "name": "Starter" },
+        "status": "active",
+        "billing_cycle": "monthly",
+        "base_price": 9900,
+        "included_usage_units": 1000,
+        "overage_rate": 5,
+        "started_at": "2026-09-29T00:00:00+00:00",
+        "current_period_start": "2026-09-29T00:00:00+00:00",
+        "current_period_end": "2026-10-29T00:00:00+00:00",
+        "cancelled_at": null,
+        "plan_changes": [],
+        "created_at": "2026-09-29T00:00:00+00:00",
+        "updated_at": "2026-09-29T00:00:00+00:00"
+    }
+}
+```
+
+**Validation:** customer_id required/must belong to merchant/must be active, plan_id required/must belong to merchant/must be active. One active subscription per customer enforced.
+
+### `GET /api/v1/subscriptions`
+
+List paginated subscriptions. Supports `?status=active|cancelled|expired`, `?customer_id=<public_id>`, `?plan_id=<public_id>` filters.
+
+### `GET /api/v1/subscriptions/{subscription}`
+
+Show a subscription with plan change history. Returns 404 for subscriptions belonging to other merchants.
+
+### `POST /api/v1/subscriptions/{subscription}/change-plan`
+
+Change the subscription's plan. **Owner only.** Creates a plan-change history record preserving from/to pricing snapshots, then updates the subscription's pricing snapshot.
+
+**Request:**
+```json
+{
+    "plan_id": "01J..."
+}
+```
+
+**Response (200):**
+```json
+{
+    "data": {
+        "id": "01J...",
+        "from_plan": { "id": "01J...", "name": "Starter" },
+        "to_plan": { "id": "01J...", "name": "Professional" },
+        "effective_at": "2026-09-29T12:00:00+00:00",
+        "from_base_price": 9900,
+        "from_included_usage_units": 1000,
+        "from_overage_rate": 5,
+        "from_billing_cycle": "monthly",
+        "to_base_price": 49900,
+        "to_included_usage_units": 10000,
+        "to_overage_rate": 3,
+        "to_billing_cycle": "monthly"
+    }
+}
+```
+
+### `POST /api/v1/subscriptions/{subscription}/cancel`
+
+Cancel an active subscription. **Owner only.** Sets status to `cancelled` and records the cancellation timestamp.
+
+**Response (200):** Returns the updated subscription resource with `status: "cancelled"` and `cancelled_at` timestamp.
+
+---
+
+## Subscription Design
+
+### Pricing Snapshots
+
+When a subscription is created, the plan's current pricing is **copied** into the subscription row:
+
+| Subscription Field | Source |
+|-------------------|--------|
+| `base_price` | `plan.base_price` at subscription time |
+| `included_usage_units` | `plan.included_usage_units` at subscription time |
+| `overage_rate` | `plan.overage_rate` at subscription time |
+| `billing_cycle` | `plan.billing_cycle` at subscription time |
+
+Editing the plan's price later does **not** retroactively change existing subscriptions.
+
+### Plan Change History
+
+Each plan change creates a `subscription_plan_changes` record with full from/to pricing:
+
+```
+subscription_plan_changes
+├── from_plan_id, from_base_price, from_included_usage_units, from_overage_rate, from_billing_cycle
+├── to_plan_id, to_base_price, to_included_usage_units, to_overage_rate, to_billing_cycle
+└── effective_at (timestamp of the change)
+```
+
+This allows future proration calculations to reconstruct exact pricing at any point in a billing period.
+
+### Billing Periods
+
+- **Monthly:** `current_period_end = current_period_start + 1 month` (calendar-aware via `addMonth()`)
+- **Yearly:** `current_period_end = current_period_start + 1 year` (calendar-aware via `addYear()`)
+
+### Concurrency
+
+- Subscription creation uses `lockForUpdate()` on the customer row to prevent duplicate active subscriptions
+- Plan changes use `lockForUpdate()` on the subscription row to prevent simultaneous modifications
+- Cancellation uses `lockForUpdate()` on the subscription row
+
+### Lifecycle
+
+```
+active → cancelled (via cancel endpoint)
+active → expired (future: when period ends without renewal)
+```
+
+One active subscription per customer. After cancellation, a new subscription can be created.
 
 ---
 
@@ -387,8 +525,6 @@ active → inactive (via DELETE endpoint)
 ```
 
 Inactive customers remain in the database. They will be referenced by future subscriptions, usage records, and invoices. Physical deletion is never performed.
-
-Customers do not have subscriptions or plans in this phase. Subscriptions will be introduced in Phase 4.
 
 ---
 
@@ -477,6 +613,18 @@ Implemented via Laravel Policy (`PlanPolicy`). The backend is the security autho
 | Deactivate customer | ✅ | ❌ |
 
 Implemented via Laravel Policy (`CustomerPolicy`).
+
+### Subscription Permissions
+
+| Action | Owner | Member |
+|--------|-------|--------|
+| List subscriptions | ✅ | ✅ |
+| View subscription | ✅ | ✅ |
+| Create subscription | ✅ | ❌ |
+| Change plan | ✅ | ❌ |
+| Cancel subscription | ✅ | ❌ |
+
+Implemented via Laravel Policy (`SubscriptionPolicy`).
 
 ---
 
@@ -574,9 +722,33 @@ Implemented via Laravel Policy (`CustomerPolicy`).
 - [x] 49 new backend tests
 - [x] 5 new frontend tests
 
+### ✅ Implemented (Phase 4 — Subscriptions & Plan Changes)
+
+- [x] Subscription model with ULID public IDs, tenant scoping
+- [x] SubscriptionStatus enum (active, cancelled, expired)
+- [x] Pricing snapshot — plan pricing copied into subscription at creation time
+- [x] `POST /api/v1/subscriptions` — create subscription (owner only)
+- [x] `GET /api/v1/subscriptions` — list with pagination, status/customer/plan filters
+- [x] `GET /api/v1/subscriptions/{subscription}` — show with plan change history
+- [x] `POST /api/v1/subscriptions/{subscription}/change-plan` — mid-cycle plan change (owner only)
+- [x] `POST /api/v1/subscriptions/{subscription}/cancel` — cancel subscription (owner only)
+- [x] Plan change history with from/to pricing snapshots (SubscriptionPlanChange model)
+- [x] One active subscription per customer constraint
+- [x] DB transactions with row-level locks for concurrency protection
+- [x] Calendar-aware billing periods (addMonth/addYear)
+- [x] SubscriptionPolicy for role-based authorization
+- [x] Tenant-scoped route model binding (cross-tenant → 404)
+- [x] Vue Subscriptions list page with pagination and status filter
+- [x] Vue Subscription detail page with plan change history
+- [x] Vue Create Subscription page with customer/plan selectors
+- [x] Nav link in authenticated layout
+- [x] Database factories with cancelled/expired/yearly states
+- [x] Development seeder (John Smith subscribed to Starter)
+- [x] Backend tests: create, list, show, change plan, cancel, model, tenant isolation
+- [x] Frontend tests
+
 ### 🔲 Planned
 
-- [ ] Customer subscriptions
 - [ ] Usage event ingestion (high-volume, idempotent)
 - [ ] Usage aggregation (queued, chunked)
 - [ ] Billing & invoice generation

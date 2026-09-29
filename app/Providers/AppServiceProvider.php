@@ -6,8 +6,10 @@ namespace App\Providers;
 
 use App\Models\Customer;
 use App\Models\Plan;
+use App\Models\Subscription;
 use App\Policies\CustomerPolicy;
 use App\Policies\PlanPolicy;
+use App\Policies\SubscriptionPolicy;
 use App\Tenancy\MerchantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
@@ -26,5 +28,6 @@ final class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Plan::class, PlanPolicy::class);
         Gate::policy(Customer::class, CustomerPolicy::class);
+        Gate::policy(Subscription::class, SubscriptionPolicy::class);
     }
 }

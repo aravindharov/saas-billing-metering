@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Actions\Subscriptions\CreateSubscription;
 use App\Enums\BillingCycle;
 use App\Models\Customer;
 use App\Models\Merchant;
@@ -62,7 +63,7 @@ final class DatabaseSeeder extends Seeder
             'overage_rate' => 2,
         ]);
 
-        Customer::factory()->forMerchant($acme)->create([
+        $john = Customer::factory()->forMerchant($acme)->create([
             'name' => 'John Smith',
             'email' => 'john@example.com',
             'external_reference' => 'CRM-10001',
@@ -78,5 +79,8 @@ final class DatabaseSeeder extends Seeder
             'name' => 'Bob Wilson',
             'email' => 'bob@example.com',
         ]);
+
+        $starter = Plan::where('merchant_id', $acme->id)->where('name', 'Starter')->firstOrFail();
+        app(CreateSubscription::class)->execute($acme, $john, $starter);
     }
 }
