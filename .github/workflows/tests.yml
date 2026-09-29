@@ -48,6 +48,7 @@ jobs:
       - name: Prepare the environment file
         run: |
           cp .env.example .env
+          echo "APP_KEY=base64:$(openssl rand -base64 32)" >> .env
           echo "APP_UID=$(id -u)" >> .env
           echo "APP_GID=$(id -g)" >> .env
 
@@ -102,6 +103,7 @@ jobs:
       - name: Prepare the environment file
         run: |
           cp .env.example .env
+          echo "APP_KEY=base64:$(openssl rand -base64 32)" >> .env
           echo "APP_UID=$(id -u)" >> .env
           echo "APP_GID=$(id -g)" >> .env
 
