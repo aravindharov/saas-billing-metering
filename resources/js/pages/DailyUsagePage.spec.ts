@@ -23,11 +23,21 @@ describe('DailyUsagePage', () => {
     beforeEach(() => {
         router = createRouter({
             history: createMemoryHistory(),
-            routes: [{ path: '/usage/daily', name: 'usage.daily', component: DailyUsagePage }],
+            routes: [
+                { path: '/usage/daily', name: 'usage.daily', component: DailyUsagePage },
+                {
+                    path: '/usage/record',
+                    name: 'usage.record',
+                    component: { template: '<div />' },
+                },
+            ],
         });
     });
 
     it('renders daily usage table after loading', async () => {
+        await router.push('/usage/daily');
+        await router.isReady();
+
         const wrapper = mount(DailyUsagePage, {
             global: { plugins: [router] },
         });
@@ -40,6 +50,9 @@ describe('DailyUsagePage', () => {
     });
 
     it('shows date filter input', async () => {
+        await router.push('/usage/daily');
+        await router.isReady();
+
         const wrapper = mount(DailyUsagePage, {
             global: { plugins: [router] },
         });
