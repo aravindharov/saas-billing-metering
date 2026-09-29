@@ -72,3 +72,21 @@ reader might question.
 | 9 | **Effective timestamp on plan changes** | `effective_at` records the exact moment of each plan change, enabling precise proration windows. |
 | 10 | **Subscription belongs to plan (FK)** | The `plan_id` on a subscription tracks the current plan. Historical plan references are preserved in `subscription_plan_changes`. |
 | 11 | **No usage/billing/invoicing** | This phase creates the subscription lifecycle only. Usage ingestion, aggregation, overage calculation, and invoicing belong to future phases. |
+
+## Phase 5 — Usage Event Ingestion
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **Client-generated `event_id` as idempotency key** | The client owns the uniqueness domain. `UNIQUE(merchant_id, event_id)` at the database level is the final protection, even under concurrent requests. Application-level existence checks are a fast path only. |
+| 2 | **Quantity as positive integer** | The assignment describes usage in "units." Integer representation avoids floating-point errors. Minimum 1, maximum 1,000,000 as a safety bound. |
+| 3 | **`occurred_at` is client-provided, stored in UTC** | The occurrence timestamp belongs to the client's domain. The server normalizes to UTC. This timestamp determines billing period and aggregation date, not `created_at`. |
+| 4 | **Late events accepted** | Usage may arrive after the fact (network delays, batch uploads). Rejecting valid historical events would lose data. Future aggregation must recompute affected periods when late events arrive. |
+| 5 | **Future events rejected beyond 5-minute tolerance** | Prevents clearly erroneous data (year 2030 timestamps). The 5-minute window accommodates clock skew between client and server. |
+| 6 | **No synchronous aggregation** | The ingestion endpoint must be fast. Aggregation, totaling, billing, and overage calculations are deferred to Phase 6 (async queue). The raw event is the durable fact. |
+| 7 | **Immutable events** | Raw usage events are the source of truth. No PUT/PATCH/DELETE endpoints. If corrections are needed, compensating events are the future approach. This preserves audit integrity. |
+| 8 | **Both owners and members can ingest** | Usage ingestion is expected to be machine-to-machine. Restricting to owners would prevent automated systems using member tokens from recording usage. |
+| 9 | **500 requests/minute per merchant** | High enough for production bursts, low enough to protect the database. Scoped by `merchant_id` so one merchant's traffic cannot starve another. |
+| 10 | **No partitioning yet** | Current composite indexes handle expected scale. Partitioning by `occurred_at` month is documented as the scaling path but not implemented because it would require changing the idempotency constraint to include the partition key. |
+| 11 | **Subscription validation at ingest time** | The subscription must be active and belong to the customer. However, `occurred_at` may predate the current subscription period (late events). Billing-period matching is deferred to the aggregation/billing phase. |
+| 12 | **No event type/category dimension** | The assignment describes generic "usage units." Adding event types would complicate the schema without clear requirements. Can be added later if needed. |
+| 13 | **`UniqueConstraintViolationException` catch for race conditions** | Two concurrent requests with the same `event_id` can both pass the existence check. The INSERT's unique constraint violation is caught and the existing record returned, guaranteeing exactly-once semantics. |

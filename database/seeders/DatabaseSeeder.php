@@ -9,8 +9,11 @@ use App\Enums\BillingCycle;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Plan;
+use App\Models\Subscription;
+use App\Models\UsageEvent;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 
 final class DatabaseSeeder extends Seeder
 {
@@ -81,6 +84,25 @@ final class DatabaseSeeder extends Seeder
         ]);
 
         $starter = Plan::where('merchant_id', $acme->id)->where('name', 'Starter')->firstOrFail();
-        app(CreateSubscription::class)->execute($acme, $john, $starter);
+        $subscription = app(CreateSubscription::class)->execute($acme, $john, $starter);
+
+        $this->seedUsageEvents($acme, $john, $subscription);
+    }
+
+    private function seedUsageEvents(Merchant $merchant, Customer $customer, Subscription $subscription): void
+    {
+        $now = Carbon::now();
+
+        for ($i = 0; $i < 5; $i++) {
+            UsageEvent::factory()
+                ->forMerchant($merchant)
+                ->forCustomer($customer)
+                ->forSubscription($subscription)
+                ->create([
+                    'event_id' => 'evt_seed_'.str_pad((string) ($i + 1), 5, '0', STR_PAD_LEFT),
+                    'quantity' => ($i + 1) * 10,
+                    'occurred_at' => $now->copy()->subDays($i),
+                ]);
+        }
     }
 }

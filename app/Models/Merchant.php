@@ -75,6 +75,12 @@ class Merchant extends Model
         return $this->hasMany(Subscription::class);
     }
 
+    /** @return HasMany<UsageEvent, $this> */
+    public function usageEvents(): HasMany
+    {
+        return $this->hasMany(UsageEvent::class);
+    }
+
     public function getRouteKeyName(): string
     {
         return 'public_id';
