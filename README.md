@@ -84,6 +84,20 @@ docker compose build          # Rebuild images
 
 ---
 
+## Development Credentials
+
+After running `docker compose exec app php artisan db:seed`, the following
+test accounts are available:
+
+| Merchant Slug | Email | Password | Role |
+|---------------|-------|----------|------|
+| `acme` | `owner@acme.test` | `password` | owner |
+| `acme` | `member@acme.test` | `password` | member |
+
+> ⚠️ These are **development-only** credentials. Never use them in production.
+
+---
+
 ## Environment Configuration
 
 Copy `.env.example` to `.env` and adjust as needed. Key variables:
