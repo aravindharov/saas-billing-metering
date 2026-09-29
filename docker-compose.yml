@@ -41,17 +41,21 @@ services:
   queue:
     <<: *app
     restart: unless-stopped
+    # Restart queue:work in a loop so aggregation keeps running after --max-time.
     command:
-      - php
-      - artisan
-      - queue:work
-      - redis
-      - --queue=high,default
-      - --sleep=1
-      - --tries=3
-      - --backoff=5
-      - --max-time=3600
-      - --max-jobs=1000
+      - sh
+      - -c
+      - |
+        while true; do
+          php artisan queue:work redis \
+            --queue=high,default \
+            --sleep=1 \
+            --tries=3 \
+            --backoff=5 \
+            --max-time=3600 \
+            --max-jobs=1000 \
+            --no-interaction
+        done
 
   scheduler:
     <<: *app

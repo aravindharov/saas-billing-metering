@@ -1,6 +1,24 @@
 <template>
     <div>
-        <h2 class="mb-6 text-2xl font-bold text-gray-800">Daily Usage</h2>
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-2xl font-bold text-gray-800">Daily Usage</h2>
+            <router-link
+                :to="{ name: 'usage.record' }"
+                class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+                Record usage
+            </router-link>
+        </div>
+
+        <p class="mb-4 text-sm text-gray-600">
+            Totals per customer per UTC day (from aggregated usage events). Use
+            <router-link :to="{ name: 'usage.record' }" class="text-blue-600 hover:underline">
+                Record usage
+            </router-link>
+            to submit new events, or run
+            <code class="rounded bg-gray-100 px-1 text-xs">php artisan usage:aggregate</code>
+            after bulk imports.
+        </p>
 
         <div class="mb-4 flex items-center gap-3">
             <input
@@ -29,7 +47,19 @@
 
         <div v-if="loading" class="text-sm text-gray-500">Loading…</div>
 
-        <div v-else-if="rows.length === 0" class="text-sm text-gray-500">No usage data found.</div>
+        <div
+            v-else-if="rows.length === 0"
+            class="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-600"
+        >
+            <p class="font-medium text-gray-800">No daily totals yet</p>
+            <p class="mt-2">
+                Aggregates appear after usage events are recorded and processed. Try
+                <router-link :to="{ name: 'usage.record' }" class="text-blue-600 hover:underline">
+                    recording usage
+                </router-link>
+                or widen the date filter (default: last 31 days).
+            </p>
+        </div>
 
         <div v-else>
             <div class="overflow-hidden rounded-lg bg-white shadow">

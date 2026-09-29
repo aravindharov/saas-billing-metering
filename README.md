@@ -173,9 +173,15 @@ docker compose exec app npm run test:coverage
 ## Queue Commands
 
 ```bash
-# The queue worker runs automatically as the `queue` Docker service.
-# To process jobs manually:
+# The `queue` Docker service runs `queue:work` in a restart loop (see docker-compose.yml).
+# Ensure it is up:
+docker compose up -d queue
+
+# To process jobs manually (one-off):
 docker compose exec app php artisan queue:work redis --queue=high,default
+
+# Jobs run inline without a worker (simple local dev only):
+# QUEUE_CONNECTION=sync in .env
 
 # Monitor failed jobs
 docker compose exec app php artisan queue:failed

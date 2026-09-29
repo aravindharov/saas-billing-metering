@@ -1,5 +1,5 @@
 import client from './client';
-import type { DailyUsageData } from '@/types/usage';
+import type { DailyUsageData, UsageEventData } from '@/types/usage';
 import type { PaginatedResponse } from '@/types/plans';
 
 export async function getDailyUsage(
@@ -19,4 +19,15 @@ export async function getDailyUsage(
         params,
     });
     return data;
+}
+
+export async function recordUsage(payload: {
+    event_id: string;
+    customer_id: string;
+    subscription_id: string;
+    quantity: number;
+    occurred_at: string;
+}): Promise<UsageEventData> {
+    const { data } = await client.post<{ data: UsageEventData }>('/v1/usage', payload);
+    return data.data;
 }
