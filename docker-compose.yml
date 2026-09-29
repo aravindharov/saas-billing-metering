@@ -1,0 +1,109 @@
+name: saas-billing-metering
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+    args:
+      APP_UID: "${APP_UID:-1000}"
+      APP_GID: "${APP_GID:-1000}"
+  image: saas-billing-metering/app:dev
+  working_dir: /var/www/html
+  user: "${APP_UID:-1000}:${APP_GID:-1000}"
+  volumes:
+    - .:/var/www/html
+    - vendor:/var/www/html/vendor
+    - node_modules:/var/www/html/node_modules
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  app:
+    <<: *app
+    restart: unless-stopped
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - -r
+        - "exit(@file_get_contents('http://127.0.0.1:8000/api/health') === false ? 1 : 0);"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  queue:
+    <<: *app
+    restart: unless-stopped
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=high,default
+      - --sleep=1
+      - --tries=3
+      - --backoff=5
+      - --max-time=3600
+      - --max-jobs=1000
+
+  scheduler:
+    <<: *app
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+
+  vite:
+    <<: *app
+    profiles: ["frontend"]
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+    ports:
+      - "127.0.0.1:5173:5173"
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-saas_local_dev_root}
+      MYSQL_DATABASE: ${DB_DATABASE:-saas_billing}
+      MYSQL_USER: ${DB_USERNAME:-saas}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-saas_local_dev}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  mysql_data: {}
+  redis_data: {}
+  vendor: {}
+  node_modules: {}

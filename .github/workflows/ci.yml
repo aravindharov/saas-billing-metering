@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_TAG: saas-billing-metering/app:dev
+
+jobs:
+  quality:
+    name: Lint, analyse and type-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Resolve the runner user
+        run: |
+          echo "APP_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "APP_GID=$(id -g)" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          tags: ${{ env.IMAGE_TAG }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            APP_UID=${{ env.APP_UID }}
+            APP_GID=${{ env.APP_GID }}
+
+      - name: Prepare the environment file
+        run: |
+          cp .env.example .env
+          echo "APP_UID=$(id -u)" >> .env
+          echo "APP_GID=$(id -g)" >> .env
+
+      - name: PHP style (Pint)
+        run: docker compose run --rm -T app ./vendor/bin/pint --test
+
+      - name: Static analysis (Larastan)
+        run: docker compose run --rm -T app composer analyse -- --no-progress
+
+      - name: Frontend types (vue-tsc)
+        run: docker compose run --rm -T app npm run typecheck
+
+      - name: Frontend lint (ESLint)
+        run: docker compose run --rm -T app npm run lint
+
+      - name: Frontend format (Prettier)
+        run: docker compose run --rm -T app npm run format:check
+
+  build:
+    name: Production asset build
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Resolve the runner user
+        run: |
+          echo "APP_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "APP_GID=$(id -g)" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          tags: ${{ env.IMAGE_TAG }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            APP_UID=${{ env.APP_UID }}
+            APP_GID=${{ env.APP_GID }}
+
+      - name: Prepare the environment file
+        run: |
+          cp .env.example .env
+          echo "APP_UID=$(id -u)" >> .env
+          echo "APP_GID=$(id -g)" >> .env
+
+      - name: Build the SPA
+        run: docker compose run --rm -T app npm run build
+
+      - name: Upload the compiled assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: public/build
+          retention-days: 7
