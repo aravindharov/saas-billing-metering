@@ -263,6 +263,138 @@ Return the current authenticated user and merchant. Requires `Authorization: Bea
 
 ---
 
+## Plans API
+
+All plan endpoints require `Authorization: Bearer <token>` and operate within the authenticated merchant's tenant scope.
+
+### `POST /api/v1/plans`
+
+Create a new plan. **Owner only.**
+
+**Request:**
+```json
+{
+    "name": "Professional",
+    "base_price": 49900,
+    "billing_cycle": "monthly",
+    "included_usage_units": 10000,
+    "overage_rate": 5
+}
+```
+
+**Response (201):**
+```json
+{
+    "data": {
+        "id": "01J...",
+        "name": "Professional",
+        "base_price": 49900,
+        "billing_cycle": "monthly",
+        "included_usage_units": 10000,
+        "overage_rate": 5,
+        "status": "active",
+        "created_at": "2026-09-29T00:00:00+00:00",
+        "updated_at": "2026-09-29T00:00:00+00:00"
+    }
+}
+```
+
+**Validation:** name required/unique per merchant/max 255, base_price integer ≥ 0, billing_cycle `monthly`|`yearly`, included_usage_units integer ≥ 0, overage_rate integer ≥ 0. Client-supplied `merchant_id` and `status` are ignored.
+
+### `GET /api/v1/plans`
+
+List paginated plans for the authenticated merchant. Supports `?status=active|archived` filter.
+
+### `GET /api/v1/plans/{plan}`
+
+Show a single plan. Returns 404 for plans belonging to other merchants (no information leakage).
+
+### `PUT /api/v1/plans/{plan}`
+
+Update a plan. **Owner only.** Supports partial updates.
+
+### `DELETE /api/v1/plans/{plan}`
+
+Archive a plan (soft-delete). **Owner only.** The plan is set to `archived` status and remains in the database for historical reference.
+
+---
+
+## Plan Schema & Money Representation
+
+### Money as Integer Minor Units
+
+All monetary values are stored as **integer minor units** (paise for INR):
+
+| Display Value | Stored Value | Field |
+|---------------|-------------|-------|
+| ₹499.00 | `49900` | `base_price` |
+| ₹0.05 | `5` | `overage_rate` |
+
+This avoids floating-point precision errors. No float arithmetic is used for monetary calculations.
+
+### Plan Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `base_price` | integer | Monthly/yearly price in minor units (paise) |
+| `billing_cycle` | enum | `monthly` or `yearly` |
+| `included_usage_units` | integer | Usage units included in the base price |
+| `overage_rate` | integer | Cost per additional usage unit in minor units |
+| `status` | enum | `active` (available for subscriptions) or `archived` (historical only) |
+
+### Plan Lifecycle
+
+```
+active → archived (via DELETE endpoint)
+```
+
+Archived plans remain in the database for historical references. They are not available for creating new subscriptions (enforced in future phases).
+
+### Pricing History Note
+
+When subscriptions are implemented (future phase), the subscription/invoice must preserve the pricing applicable at the time of subscription or plan change. The current plan price may be edited freely; a future subscription/pricing snapshot mechanism will ensure historical billing integrity.
+
+---
+
+## Cache Strategy
+
+### Plan Caching
+
+Plan lookups are cached in Redis to reduce database queries.
+
+**Cache key structure:**
+- Single plan: `plans:{merchant_id}:{plan_public_id}`
+- Plan list: `plans:{merchant_id}:list`
+
+**Invalidation triggers:**
+| Event | Invalidated Keys |
+|-------|-----------------|
+| Plan created | `plans:{merchant_id}:list` |
+| Plan updated | `plans:{merchant_id}:{plan_public_id}` + `plans:{merchant_id}:list` |
+| Plan archived | `plans:{merchant_id}:{plan_public_id}` + `plans:{merchant_id}:list` |
+
+**Merchant isolation:** Cache keys include `merchant_id`, ensuring Merchant A never receives cached data from Merchant B.
+
+**TTL:** 1 hour (3600 seconds). Explicit invalidation on writes ensures consistency; the TTL is a safety net.
+
+---
+
+## Authorization
+
+### Plan Permissions
+
+| Action | Owner | Member |
+|--------|-------|--------|
+| List plans | ✅ | ✅ |
+| View plan | ✅ | ✅ |
+| Create plan | ✅ | ❌ |
+| Update plan | ✅ | ❌ |
+| Archive plan | ✅ | ❌ |
+
+Implemented via Laravel Policy (`PlanPolicy`). The backend is the security authority; frontend permission checks are for UX only.
+
+---
+
 ## Architecture Principles
 
 - **Thin controllers** — Business logic lives in Actions/Services, not controllers.
@@ -313,9 +445,31 @@ Return the current authenticated user and merchant. Requires `Authorization: Bea
 - [x] 49 backend tests (121 assertions)
 - [x] 9 frontend tests
 
+### ✅ Implemented (Phase 2 — Plans & Pricing)
+
+- [x] Plan model with ULID public IDs, merchant relationship
+- [x] BillingCycle enum (monthly, yearly)
+- [x] PlanStatus enum (active, archived)
+- [x] `POST /api/v1/plans` — create plan (owner only)
+- [x] `GET /api/v1/plans` — list plans with pagination and status filter
+- [x] `GET /api/v1/plans/{plan}` — show plan
+- [x] `PUT /api/v1/plans/{plan}` — update plan (owner only)
+- [x] `DELETE /api/v1/plans/{plan}` — archive plan (owner only, soft-delete)
+- [x] Money as integer minor units (base_price, overage_rate)
+- [x] Plan name uniqueness per merchant
+- [x] PlanPolicy for role-based authorization (owner=full, member=read-only)
+- [x] Tenant-scoped route model binding (cross-tenant → 404, no info leakage)
+- [x] Plan caching with Redis (merchant-scoped keys, invalidation on write)
+- [x] Vue Plans list page with pagination, status filter, archive action
+- [x] Vue Plan create/edit form page
+- [x] Nav link in authenticated layout
+- [x] Database factory with active/archived/monthly/yearly states
+- [x] Development seeder (Starter, Professional, Enterprise plans)
+- [x] 57 new backend tests
+- [x] 5 new frontend tests
+
 ### 🔲 Planned
 
-- [ ] Plans & pricing
 - [ ] Customer subscriptions
 - [ ] Usage event ingestion (high-volume, idempotent)
 - [ ] Usage aggregation (queued, chunked)

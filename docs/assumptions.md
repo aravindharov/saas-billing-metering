@@ -30,3 +30,17 @@ reader might question.
 | 8 | **Opaque auth failures** | All credential failures return the same message. The API never reveals whether the merchant, email, or password was wrong. |
 | 9 | **Token abilities deferred** | Initial tokens carry no specific abilities. Future phases may introduce scoped abilities (e.g., read-only tokens, machine tokens). |
 | 10 | **Frontend auth is UX only** | Vue Router guards protect routes for user experience. The API independently authenticates and authorizes every request. |
+
+## Phase 2 — Plans & Pricing
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **Money as integer minor units** | `base_price` and `overage_rate` are stored as `UNSIGNED BIGINT` representing paise (₹1.00 = 100 paise). No floats anywhere in the money path. |
+| 2 | **Soft-delete via status** | `DELETE /plans/{id}` sets status to `archived` instead of physically deleting. Plans may be referenced by future subscriptions/invoices. |
+| 3 | **Plan name uniqueness per merchant** | `UNIQUE(merchant_id, name)` — different merchants can have plans with the same name. |
+| 4 | **Owner-only mutations** | Only owners can create, update, or archive plans. Members have read-only access. Implemented via Laravel Policy. |
+| 5 | **Tenant-scoped route model binding** | `Plan::resolveRouteBinding` scopes queries to the authenticated merchant. Cross-tenant requests receive 404 (not 403), preventing information leakage. |
+| 6 | **Middleware priority** | `ResolveMerchant` middleware runs before `SubstituteBindings` so that route model binding can scope to the resolved tenant. |
+| 7 | **Pricing snapshots deferred** | Editing a plan's price changes it immediately. When subscriptions are introduced, a pricing snapshot mechanism will preserve the price applicable at subscription time. |
+| 8 | **Cache scoped by merchant_id** | Cache keys include `merchant_id` to guarantee tenant isolation. Keys are invalidated on every write (create, update, archive). |
+| 9 | **No billing calculations** | This phase establishes pricing data only. Billing, invoicing, and overage calculations belong to future phases. |
