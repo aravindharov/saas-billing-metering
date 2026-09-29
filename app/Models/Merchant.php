@@ -57,6 +57,24 @@ class Merchant extends Model
         return $this->hasMany(User::class);
     }
 
+    /** @return HasMany<Plan, $this> */
+    public function plans(): HasMany
+    {
+        return $this->hasMany(Plan::class);
+    }
+
+    /** @return HasMany<Customer, $this> */
+    public function customers(): HasMany
+    {
+        return $this->hasMany(Customer::class);
+    }
+
+    /** @return HasMany<Subscription, $this> */
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
     public function getRouteKeyName(): string
     {
         return 'public_id';

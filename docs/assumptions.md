@@ -30,3 +30,45 @@ reader might question.
 | 8 | **Opaque auth failures** | All credential failures return the same message. The API never reveals whether the merchant, email, or password was wrong. |
 | 9 | **Token abilities deferred** | Initial tokens carry no specific abilities. Future phases may introduce scoped abilities (e.g., read-only tokens, machine tokens). |
 | 10 | **Frontend auth is UX only** | Vue Router guards protect routes for user experience. The API independently authenticates and authorizes every request. |
+
+## Phase 2 — Plans & Pricing
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **Money as integer minor units** | `base_price` and `overage_rate` are stored as `UNSIGNED BIGINT` representing paise (₹1.00 = 100 paise). No floats anywhere in the money path. |
+| 2 | **Soft-delete via status** | `DELETE /plans/{id}` sets status to `archived` instead of physically deleting. Plans may be referenced by future subscriptions/invoices. |
+| 3 | **Plan name uniqueness per merchant** | `UNIQUE(merchant_id, name)` — different merchants can have plans with the same name. |
+| 4 | **Owner-only mutations** | Only owners can create, update, or archive plans. Members have read-only access. Implemented via Laravel Policy. |
+| 5 | **Tenant-scoped route model binding** | `Plan::resolveRouteBinding` scopes queries to the authenticated merchant. Cross-tenant requests receive 404 (not 403), preventing information leakage. |
+| 6 | **Middleware priority** | `ResolveMerchant` middleware runs before `SubstituteBindings` so that route model binding can scope to the resolved tenant. |
+| 7 | **Pricing snapshots deferred** | Editing a plan's price changes it immediately. When subscriptions are introduced, a pricing snapshot mechanism will preserve the price applicable at subscription time. |
+| 8 | **Cache scoped by merchant_id** | Cache keys include `merchant_id` to guarantee tenant isolation. Keys are invalidated on every write (create, update, archive). |
+| 9 | **No billing calculations** | This phase establishes pricing data only. Billing, invoicing, and overage calculations belong to future phases. |
+
+## Phase 3 — Customers
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **Soft-delete via status** | `DELETE /customers/{id}` sets status to `inactive` instead of physically deleting. Customers will be referenced by future subscriptions, usage, and invoices. |
+| 2 | **External reference optional, unique per merchant** | `UNIQUE(merchant_id, external_reference)` with nullable — allows merchants to link customers to external CRM/account systems. Different merchants can use the same reference. |
+| 3 | **Email not unique** | Multiple customers under the same merchant can share an email address. Uniqueness is enforced on `external_reference` instead. |
+| 4 | **Search via LIKE queries** | Simple `LIKE %search%` on name/email/external_reference. Sufficient for the current scale. A full-text search engine can be added later if needed. |
+| 5 | **No subscriptions or billing** | Customers are standalone entities in this phase. Subscription assignment belongs to Phase 4. |
+| 6 | **Tenant-scoped route model binding** | Same pattern as Plan — `Customer::resolveRouteBinding` scopes to the authenticated merchant. Cross-tenant → 404. |
+| 7 | **Indexes for query patterns** | `(merchant_id, status)` for filtered listing, `(merchant_id, email)` for email lookups, `UNIQUE(merchant_id, external_reference)` for reference lookups. |
+
+## Phase 4 — Subscriptions & Plan Changes
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **Pricing snapshot at subscription time** | Plan pricing is copied into the subscription row at creation. Editing the plan later does not affect existing subscriptions. This ensures billing integrity. |
+| 2 | **Plan change history with full from/to pricing** | `subscription_plan_changes` records preserve the exact pricing before and after each change. This supports future proration calculations without relying on plan edit history. |
+| 3 | **One active subscription per customer** | Enforced via DB query + row lock. A customer must cancel before subscribing to a new plan. Simplifies billing and avoids conflicting active subscriptions. |
+| 4 | **Row-level locks for concurrency** | `lockForUpdate()` on customer (for creation) and subscription (for changes/cancellation) prevents race conditions in concurrent requests. |
+| 5 | **Calendar-aware periods** | `addMonth()` / `addYear()` rather than fixed 30/365 days. January 31 → February 28 is handled by Carbon. |
+| 6 | **No proration calculation** | Plan changes update the pricing snapshot immediately. Actual proration (billing calculation) is deferred to a future phase. The historical pricing segments support it. |
+| 7 | **No period renewal** | Period renewal (advancing `current_period_start`/`current_period_end`) will be implemented with billing in a future phase. |
+| 8 | **Cancelled subscriptions keep their data** | Cancellation sets status and timestamp but preserves all pricing and period data for historical reference. |
+| 9 | **Effective timestamp on plan changes** | `effective_at` records the exact moment of each plan change, enabling precise proration windows. |
+| 10 | **Subscription belongs to plan (FK)** | The `plan_id` on a subscription tracks the current plan. Historical plan references are preserved in `subscription_plan_changes`. |
+| 11 | **No usage/billing/invoicing** | This phase creates the subscription lifecycle only. Usage ingestion, aggregation, overage calculation, and invoicing belong to future phases. |

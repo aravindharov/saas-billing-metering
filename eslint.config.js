@@ -22,9 +22,10 @@ export default tseslint.config(
         },
         rules: {
             'vue/multi-word-component-names': 'off',
-            'vue/html-indent': ['warn', 4],
+            'vue/html-indent': 'off',
             'vue/singleline-html-element-content-newline': 'off',
             'vue/max-attributes-per-line': 'off',
+            'vue/html-closing-bracket-newline': 'off',
             'vue/html-self-closing': [
                 'warn',
                 { html: { void: 'any', normal: 'always', component: 'always' } },
