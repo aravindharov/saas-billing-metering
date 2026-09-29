@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\BillingCycle;
 use App\Models\Merchant;
+use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -33,6 +35,30 @@ final class DatabaseSeeder extends Seeder
         User::factory()->member()->forMerchant($acme)->create([
             'name' => 'Acme Member',
             'email' => 'member@acme.test',
+        ]);
+
+        Plan::factory()->forMerchant($acme)->create([
+            'name' => 'Starter',
+            'base_price' => 9900,
+            'billing_cycle' => BillingCycle::Monthly,
+            'included_usage_units' => 1000,
+            'overage_rate' => 5,
+        ]);
+
+        Plan::factory()->forMerchant($acme)->create([
+            'name' => 'Professional',
+            'base_price' => 49900,
+            'billing_cycle' => BillingCycle::Monthly,
+            'included_usage_units' => 10000,
+            'overage_rate' => 3,
+        ]);
+
+        Plan::factory()->forMerchant($acme)->yearly()->create([
+            'name' => 'Enterprise',
+            'base_price' => 499900,
+            'billing_cycle' => BillingCycle::Yearly,
+            'included_usage_units' => 100000,
+            'overage_rate' => 2,
         ]);
     }
 }

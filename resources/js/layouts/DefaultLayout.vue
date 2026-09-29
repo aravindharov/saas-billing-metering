@@ -2,10 +2,24 @@
     <div class="min-h-screen bg-gray-50">
         <header class="bg-white shadow-sm border-b border-gray-200">
             <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-                <div>
+                <div class="flex items-center gap-6">
                     <h1 class="text-lg font-semibold text-gray-900">
                         {{ merchant?.name ?? 'Subscription Billing & Usage Metering' }}
                     </h1>
+                    <nav class="flex items-center gap-4 text-sm">
+                        <router-link
+                            :to="{ name: 'home' }"
+                            class="text-gray-600 hover:text-gray-900"
+                        >
+                            Dashboard
+                        </router-link>
+                        <router-link
+                            :to="{ name: 'plans.index' }"
+                            class="text-gray-600 hover:text-gray-900"
+                        >
+                            Plans
+                        </router-link>
+                    </nav>
                 </div>
                 <div v-if="user" class="flex items-center gap-4 text-sm">
                     <span class="text-gray-600">

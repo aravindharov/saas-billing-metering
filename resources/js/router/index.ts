@@ -19,6 +19,21 @@ const routes: RouteRecordRaw[] = [
                 name: 'home',
                 component: () => import('@/pages/HomePage.vue'),
             },
+            {
+                path: 'plans',
+                name: 'plans.index',
+                component: () => import('@/pages/PlansPage.vue'),
+            },
+            {
+                path: 'plans/create',
+                name: 'plans.create',
+                component: () => import('@/pages/PlanFormPage.vue'),
+            },
+            {
+                path: 'plans/:id/edit',
+                name: 'plans.edit',
+                component: () => import('@/pages/PlanFormPage.vue'),
+            },
         ],
     },
 ];
