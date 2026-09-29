@@ -319,6 +319,79 @@ Archive a plan (soft-delete). **Owner only.** The plan is set to `archived` stat
 
 ---
 
+## Customers API
+
+All customer endpoints require `Authorization: Bearer <token>` and operate within the authenticated merchant's tenant scope.
+
+### `POST /api/v1/customers`
+
+Create a new customer. **Owner only.**
+
+**Request:**
+```json
+{
+    "name": "John Smith",
+    "email": "john@example.com",
+    "external_reference": "CRM-10001"
+}
+```
+
+**Response (201):**
+```json
+{
+    "data": {
+        "id": "01J...",
+        "name": "John Smith",
+        "email": "john@example.com",
+        "external_reference": "CRM-10001",
+        "status": "active",
+        "created_at": "2026-09-29T00:00:00+00:00",
+        "updated_at": "2026-09-29T00:00:00+00:00"
+    }
+}
+```
+
+**Validation:** name required/max 255, email required/valid/max 255, external_reference optional/max 255/unique per merchant. Client-supplied `merchant_id` and `status` are ignored.
+
+### `GET /api/v1/customers`
+
+List paginated customers for the authenticated merchant. Supports `?status=active|inactive` filter and `?search=` for name/email/external reference.
+
+### `GET /api/v1/customers/{customer}`
+
+Show a single customer. Returns 404 for customers belonging to other merchants (no information leakage).
+
+### `PUT /api/v1/customers/{customer}`
+
+Update a customer. **Owner only.** Supports partial updates.
+
+### `DELETE /api/v1/customers/{customer}`
+
+Deactivate a customer (soft-delete). **Owner only.** The customer is set to `inactive` status and remains in the database for historical reference by future subscriptions/invoices.
+
+---
+
+## Customer Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Customer display name |
+| `email` | string | Customer email address |
+| `external_reference` | string (nullable) | Merchant's external CRM/account ID. Unique per merchant. |
+| `status` | enum | `active` or `inactive` |
+
+### Customer Lifecycle
+
+```
+active → inactive (via DELETE endpoint)
+```
+
+Inactive customers remain in the database. They will be referenced by future subscriptions, usage records, and invoices. Physical deletion is never performed.
+
+Customers do not have subscriptions or plans in this phase. Subscriptions will be introduced in Phase 4.
+
+---
+
 ## Plan Schema & Money Representation
 
 ### Money as Integer Minor Units
@@ -393,6 +466,18 @@ Plan lookups are cached in Redis to reduce database queries.
 
 Implemented via Laravel Policy (`PlanPolicy`). The backend is the security authority; frontend permission checks are for UX only.
 
+### Customer Permissions
+
+| Action | Owner | Member |
+|--------|-------|--------|
+| List customers | ✅ | ✅ |
+| View customer | ✅ | ✅ |
+| Create customer | ✅ | ❌ |
+| Update customer | ✅ | ❌ |
+| Deactivate customer | ✅ | ❌ |
+
+Implemented via Laravel Policy (`CustomerPolicy`).
+
 ---
 
 ## Architecture Principles
@@ -466,6 +551,27 @@ Implemented via Laravel Policy (`PlanPolicy`). The backend is the security autho
 - [x] Database factory with active/archived/monthly/yearly states
 - [x] Development seeder (Starter, Professional, Enterprise plans)
 - [x] 57 new backend tests
+- [x] 5 new frontend tests
+
+### ✅ Implemented (Phase 3 — Customers)
+
+- [x] Customer model with ULID public IDs, merchant relationship
+- [x] CustomerStatus enum (active, inactive)
+- [x] `POST /api/v1/customers` — create customer (owner only)
+- [x] `GET /api/v1/customers` — list with pagination, status filter, search
+- [x] `GET /api/v1/customers/{customer}` — show customer
+- [x] `PUT /api/v1/customers/{customer}` — update customer (owner only)
+- [x] `DELETE /api/v1/customers/{customer}` — deactivate customer (owner only, soft-delete)
+- [x] External reference (optional, unique per merchant)
+- [x] Search by name, email, external reference
+- [x] CustomerPolicy for role-based authorization (owner=full, member=read-only)
+- [x] Tenant-scoped route model binding (cross-tenant → 404)
+- [x] Vue Customers list page with pagination, search, status filter
+- [x] Vue Customer create/edit form page
+- [x] Nav link in authenticated layout
+- [x] Database factory with active/inactive/withExternalReference states
+- [x] Development seeder (John Smith, Jane Doe, Bob Wilson)
+- [x] 49 new backend tests
 - [x] 5 new frontend tests
 
 ### 🔲 Planned

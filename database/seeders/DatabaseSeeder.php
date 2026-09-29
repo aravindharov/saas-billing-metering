@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\BillingCycle;
+use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Plan;
 use App\Models\User;
@@ -59,6 +60,23 @@ final class DatabaseSeeder extends Seeder
             'billing_cycle' => BillingCycle::Yearly,
             'included_usage_units' => 100000,
             'overage_rate' => 2,
+        ]);
+
+        Customer::factory()->forMerchant($acme)->create([
+            'name' => 'John Smith',
+            'email' => 'john@example.com',
+            'external_reference' => 'CRM-10001',
+        ]);
+
+        Customer::factory()->forMerchant($acme)->create([
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+            'external_reference' => 'CRM-10002',
+        ]);
+
+        Customer::factory()->forMerchant($acme)->inactive()->create([
+            'name' => 'Bob Wilson',
+            'email' => 'bob@example.com',
         ]);
     }
 }
