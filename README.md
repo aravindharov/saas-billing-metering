@@ -9,7 +9,19 @@ subscriptions, usage-event ingestion, aggregation, and invoice generation.
 
 Multi-tenant SaaS backend: merchants define **plans**, **customers** subscribe with **pricing snapshots**, **usage events** are ingested at volume with idempotency, **daily usage** is aggregated asynchronously, **invoices** are generated from segments (proration + overage), and a **merchant dashboard** reads the daily read model.
 
-**Detailed docs:** [Architecture](docs/architecture.md) · [Assumptions](docs/assumptions.md) · [Assignment audit](docs/assignment-checklist.md) · [Demo script](docs/demo-script.md) · [Final review](docs/final-review.md) · [AI prompts](prompts/)
+**Detailed docs:** [Architecture](docs/architecture.md) · [Assumptions](docs/assumptions.md) · [Assignment audit](docs/assignment-checklist.md) · [Demo script](docs/demo-script.md) · [Demo recording](docs/demo-recording.md) · [Final review](docs/final-review.md) · [AI prompts](prompts/)
+
+## Demo recording
+
+Evaluators: watch the **public** application walkthrough here (5–10 minutes, UI + billing flow):
+
+| | |
+|---|---|
+| **Recording** | _Not published yet — candidate must add a public URL before final submission_ |
+| **Script** | [docs/demo-script.md](docs/demo-script.md) |
+| **How to host** | [docs/demo-recording.md](docs/demo-recording.md) |
+
+Replace the recording row with a markdown link, for example: `[Watch demo (YouTube)](https://youtu.be/...)`.
 
 ## Core domain model
 
@@ -1025,9 +1037,10 @@ Summary:
 | Billing, invoices, dashboard | ✅ |
 | 50L+ / performance strategy | ✅ |
 | Tests + CI quality gates | ✅ |
-| Documentation + demo | ✅ |
+| Documentation + demo script | ✅ |
+| Demo recording (public URL in README) | ⚠️ See [Demo recording](#demo-recording) |
 | AI prompt log | ✅ [`prompts/`](prompts/) |
 
 **Out of scope:** payments, taxes, refunds, dunning, partitioning implementation (documented only).
 
-**Demo walkthrough:** [docs/demo-script.md](docs/demo-script.md) · **Submission notes:** [docs/final-review.md](docs/final-review.md)
+**Demo walkthrough:** [docs/demo-script.md](docs/demo-script.md) · **Recording guide:** [docs/demo-recording.md](docs/demo-recording.md) · **Submission notes:** [docs/final-review.md](docs/final-review.md)

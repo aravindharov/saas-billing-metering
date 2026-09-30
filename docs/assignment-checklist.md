@@ -71,6 +71,7 @@ Legend: **Status** — ✅ verified in repo | ⚠️ partial / documented trade-
 | **AI prompt log** | Markdown transcripts per phase | [`prompts/`](../prompts/) | ✅ |
 | **Setup / commands documented** | Docker, artisan commands | README Local Setup, Backend Commands | ✅ |
 | **Demo path** | Seeder + docs | `DatabaseSeeder`, `docs/demo-script.md` | ✅ |
+| **Demo recording (public)** | URL in README for evaluators | [README § Demo recording](../README.md#demo-recording), [docs/demo-recording.md](demo-recording.md) | ⚠️ URL pending |
 | **Authentication** | Sanctum login/logout/me | `routes/api.php`, auth tests | ✅ |
 | **Health check** | `GET /api/health` | `HealthEndpointTest` | ✅ |
 | **SPA admin UI** | Vue pages for core flows | `resources/js/pages/*` | ✅ |

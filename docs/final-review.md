@@ -30,6 +30,7 @@ Full requirement matrix: [`docs/assignment-checklist.md`](assignment-checklist.m
 
 ## Known limitations
 
+- **Demo recording:** Assignment requires a **public** walkthrough link in the README. Until that URL is set, evaluators should use [docs/demo-script.md](demo-script.md) locally or request the link from the candidate.
 - **AI prompt log:** phase prompts are stored as **markdown transcripts** under [`prompts/`](../prompts/), not PNG screenshots. If the PDF requires images, add screenshots locally; none are fabricated in this repository.
 - **Seeder** creates usage and daily aggregates but not invoices (billing period still active); demo uses generate-invoice flow documented in [`docs/demo-script.md`](demo-script.md).
 - **Subscription `expired` status** exists in enum; automatic expiry job not implemented (cancel path is primary).

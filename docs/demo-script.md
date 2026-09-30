@@ -1,5 +1,7 @@
 # Demo script (~5–10 minutes)
 
+Use this outline for a **live demo** or a **screen recording**. For hosting and the public link evaluators will open, see **[demo-recording.md](demo-recording.md)**.
+
 Target: evaluator with Docker. Base URL: **http://localhost:8000**.
 
 ## Before you start
