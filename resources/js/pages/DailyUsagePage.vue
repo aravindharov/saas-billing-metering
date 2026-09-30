@@ -27,11 +27,9 @@
 
         <UiEmpty v-else-if="rows.length === 0" title="No daily totals yet">
             Aggregates appear after usage events are recorded and processed. Try
-            <router-link :to="{ name: 'usage.record' }" class="ui-link"
-                >
-recording usage
-</router-link
-            >
+            <router-link :to="{ name: 'usage.record' }" class="ui-link">
+                recording usage
+            </router-link>
             or widen the date filter (default: last 31 days).
         </UiEmpty>
 

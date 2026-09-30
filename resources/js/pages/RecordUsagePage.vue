@@ -108,11 +108,9 @@
                 <button type="submit" class="ui-btn-primary" :disabled="submitting">
                     {{ submitting ? 'Submitting…' : 'Record usage' }}
                 </button>
-                <router-link :to="{ name: 'usage.daily' }" class="ui-link-muted"
-                    >
-Cancel
-</router-link
-                >
+                <router-link :to="{ name: 'usage.daily' }" class="ui-link-muted">
+                    Cancel
+                </router-link>
             </div>
         </form>
     </div>

@@ -68,11 +68,9 @@
                 <button type="submit" class="ui-btn-primary" :disabled="submitting">
                     {{ submitting ? 'Saving…' : isEdit ? 'Update Plan' : 'Create Plan' }}
                 </button>
-                <router-link :to="{ name: 'plans.index' }" class="ui-link-muted"
-                    >
-Cancel
-</router-link
-                >
+                <router-link :to="{ name: 'plans.index' }" class="ui-link-muted">
+                    Cancel
+                </router-link>
             </div>
         </form>
     </div>
