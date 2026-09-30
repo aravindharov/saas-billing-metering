@@ -1,28 +1,13 @@
 <template>
-    <div>
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Create Subscription</h2>
+    <div class="ui-page">
+        <UiPageHeader title="Create Subscription" />
 
-        <form
-            class="bg-white shadow rounded-lg px-8 py-6 space-y-4 max-w-lg"
-            @submit.prevent="handleSubmit"
-        >
-            <div
-                v-if="error"
-                class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm"
-            >
-                {{ error }}
-            </div>
+        <form class="ui-form" @submit.prevent="handleSubmit">
+            <UiAlert v-if="error">{{ error }}</UiAlert>
 
             <div>
-                <label for="customer_id" class="block text-sm font-medium text-gray-700 mb-1"
-                    >Customer</label
-                >
-                <select
-                    id="customer_id"
-                    v-model="form.customer_id"
-                    required
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <label for="customer_id" class="ui-label">Customer</label>
+                <select id="customer_id" v-model="form.customer_id" required class="ui-select">
                     <option value="">Select a customer…</option>
                     <option v-for="c in customers" :key="c.id" :value="c.id">
                         {{ c.name }} ({{ c.email }})
@@ -31,15 +16,8 @@
             </div>
 
             <div>
-                <label for="plan_id" class="block text-sm font-medium text-gray-700 mb-1"
-                    >Plan</label
-                >
-                <select
-                    id="plan_id"
-                    v-model="form.plan_id"
-                    required
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <label for="plan_id" class="ui-label">Plan</label>
+                <select id="plan_id" v-model="form.plan_id" required class="ui-select">
                     <option value="">Select a plan…</option>
                     <option v-for="p in plans" :key="p.id" :value="p.id">
                         {{ p.name }} — {{ formatMoney(p.base_price) }}/{{ p.billing_cycle }}
@@ -47,18 +25,11 @@
                 </select>
             </div>
 
-            <div class="flex items-center gap-3 pt-2">
-                <button
-                    type="submit"
-                    :disabled="submitting"
-                    class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+            <div class="ui-form-actions">
+                <button type="submit" class="ui-btn-primary" :disabled="submitting">
                     {{ submitting ? 'Creating…' : 'Create Subscription' }}
                 </button>
-                <router-link
-                    :to="{ name: 'subscriptions.index' }"
-                    class="text-gray-600 hover:text-gray-800 text-sm"
-                >
+                <router-link :to="{ name: 'subscriptions.index' }" class="ui-link-muted">
                     Cancel
                 </router-link>
             </div>
@@ -69,6 +40,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import UiAlert from '@/components/UiAlert.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
 import * as subsApi from '@/api/subscriptions';
 import * as customersApi from '@/api/customers';
 import * as plansApi from '@/api/plans';

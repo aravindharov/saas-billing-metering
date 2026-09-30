@@ -1,120 +1,75 @@
 <template>
-    <div>
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-800">Subscriptions</h2>
-            <router-link
-                v-if="isOwner"
-                :to="{ name: 'subscriptions.create' }"
-                class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700"
-            >
-                Create Subscription
-            </router-link>
-        </div>
+    <div class="ui-page">
+        <UiPageHeader title="Subscriptions">
+            <template #actions>
+                <select
+                    v-model="statusFilter"
+                    class="ui-select w-auto min-w-[10rem]"
+                    @change="loadSubscriptions(1)"
+                >
+                    <option value="">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="expired">Expired</option>
+                </select>
+                <router-link
+                    v-if="isOwner"
+                    :to="{ name: 'subscriptions.create' }"
+                    class="ui-btn-primary"
+                >
+                    Create Subscription
+                </router-link>
+            </template>
+        </UiPageHeader>
 
-        <div class="flex items-center gap-3 mb-4">
-            <select
-                v-model="statusFilter"
-                class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                @change="loadSubscriptions(1)"
-            >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="expired">Expired</option>
-            </select>
-        </div>
+        <UiAlert v-if="error">{{ error }}</UiAlert>
+        <UiLoading v-if="loading" message="Loading subscriptions…" />
+        <UiEmpty
+            v-else-if="subscriptions.length === 0"
+            title="No subscriptions found"
+            message="No subscriptions found."
+        />
 
-        <div
-            v-if="error"
-            class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4"
-        >
-            {{ error }}
-        </div>
-
-        <div v-if="loading" class="text-gray-500 text-sm">Loading subscriptions…</div>
-
-        <div v-else-if="subscriptions.length === 0" class="text-gray-500 text-sm">
-            No subscriptions found.
-        </div>
-
-        <div v-else>
-            <div class="bg-white shadow rounded-lg overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+        <template v-else>
+            <div class="ui-table-wrap">
+                <table class="ui-table">
+                    <thead>
                         <tr>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Customer
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Plan
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Status
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Cycle
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Base Price
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Period
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Actions
-                            </th>
+                            <th>Customer</th>
+                            <th>Plan</th>
+                            <th>Status</th>
+                            <th>Cycle</th>
+                            <th>Base Price</th>
+                            <th>Period</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody>
                         <tr v-for="sub in subscriptions" :key="sub.id">
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">
-                                {{ sub.customer?.name ?? '—' }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
-                                {{ sub.plan?.name ?? '—' }}
-                            </td>
-                            <td class="px-6 py-4 text-sm">
-                                <span
-                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                    :class="statusClass(sub.status)"
-                                >
+                            <td class="ui-table-primary">{{ sub.customer?.name ?? '—' }}</td>
+                            <td>{{ sub.plan?.name ?? '—' }}</td>
+                            <td>
+                                <UiBadge :variant="statusVariant(sub.status)">
                                     {{ sub.status }}
-                                </span>
+                                </UiBadge>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700 capitalize">
-                                {{ sub.billing_cycle }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
-                                {{ formatMoney(sub.base_price) }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
+                            <td class="capitalize">{{ sub.billing_cycle }}</td>
+                            <td>{{ formatMoney(sub.base_price) }}</td>
+                            <td class="text-slate-500 whitespace-nowrap">
                                 {{ formatDate(sub.current_period_start) }} —
                                 {{ formatDate(sub.current_period_end) }}
                             </td>
-                            <td class="px-6 py-4 text-sm space-x-2">
+                            <td class="space-x-3 whitespace-nowrap">
                                 <router-link
                                     :to="{ name: 'subscriptions.show', params: { id: sub.id } }"
-                                    class="text-blue-600 hover:text-blue-800"
+                                    class="ui-link"
                                 >
                                     View
                                 </router-link>
                                 <button
                                     v-if="isOwner && sub.status === 'active'"
-                                    class="text-red-600 hover:text-red-800"
+                                    type="button"
+                                    class="ui-btn-danger px-0 py-0"
                                     @click="confirmCancel(sub)"
                                 >
                                     Cancel
@@ -125,39 +80,19 @@
                 </table>
             </div>
 
-            <div
-                v-if="meta && meta.last_page > 1"
-                class="flex items-center justify-between mt-4 text-sm text-gray-600"
-            >
-                <span
-                    >Page {{ meta.current_page }} of {{ meta.last_page }} ({{
-                        meta.total
-                    }}
-                    subscriptions)</span
-                >
-                <div class="space-x-2">
-                    <button
-                        :disabled="meta.current_page <= 1"
-                        class="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                        @click="loadSubscriptions(meta.current_page - 1)"
-                    >
-                        Previous
-                    </button>
-                    <button
-                        :disabled="meta.current_page >= meta.last_page"
-                        class="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                        @click="loadSubscriptions(meta.current_page + 1)"
-                    >
-                        Next
-                    </button>
-                </div>
-            </div>
-        </div>
+            <UiPagination :meta="meta" label="subscriptions" @change="loadSubscriptions" />
+        </template>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import UiAlert from '@/components/UiAlert.vue';
+import UiBadge from '@/components/UiBadge.vue';
+import UiEmpty from '@/components/UiEmpty.vue';
+import UiLoading from '@/components/UiLoading.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
+import UiPagination from '@/components/UiPagination.vue';
 import { useAuth } from '@/composables/useAuth';
 import * as subsApi from '@/api/subscriptions';
 import type { SubscriptionData } from '@/types/subscriptions';
@@ -176,10 +111,10 @@ function formatMoney(paise: number): string {
 function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString();
 }
-function statusClass(status: string): string {
-    if (status === 'active') return 'bg-green-100 text-green-800';
-    if (status === 'cancelled') return 'bg-red-100 text-red-800';
-    return 'bg-gray-100 text-gray-800';
+function statusVariant(status: string): 'success' | 'danger' | 'neutral' {
+    if (status === 'active') return 'success';
+    if (status === 'cancelled') return 'danger';
+    return 'neutral';
 }
 
 async function loadSubscriptions(page = 1) {

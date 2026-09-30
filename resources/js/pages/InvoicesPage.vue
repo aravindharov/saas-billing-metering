@@ -1,107 +1,62 @@
 <template>
-    <div>
-        <h2 class="mb-6 text-2xl font-bold text-gray-800">Invoices</h2>
+    <div class="ui-page">
+        <UiPageHeader title="Invoices">
+            <template #actions>
+                <select
+                    v-model="statusFilter"
+                    class="ui-select w-auto min-w-[10rem]"
+                    @change="loadInvoices(1)"
+                >
+                    <option value="">All statuses</option>
+                    <option value="issued">Issued</option>
+                    <option value="draft">Draft</option>
+                </select>
+            </template>
+        </UiPageHeader>
 
-        <div class="mb-4 flex flex-wrap items-center gap-3">
-            <select
-                v-model="statusFilter"
-                class="rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                @change="loadInvoices(1)"
-            >
-                <option value="">All statuses</option>
-                <option value="issued">Issued</option>
-                <option value="draft">Draft</option>
-            </select>
-        </div>
+        <UiAlert v-if="error">{{ error }}</UiAlert>
+        <UiLoading v-if="loading" message="Loading invoices…" />
+        <UiEmpty
+            v-else-if="invoices.length === 0"
+            title="No invoices found"
+            message="No invoices found."
+        />
 
-        <div
-            v-if="error"
-            class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
-            {{ error }}
-        </div>
-
-        <div v-if="loading" class="text-sm text-gray-500">Loading invoices…</div>
-
-        <div v-else-if="invoices.length === 0" class="text-sm text-gray-500">
-            No invoices found.
-        </div>
-
-        <div v-else>
-            <div class="overflow-hidden rounded-lg bg-white shadow">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+        <template v-else>
+            <div class="ui-table-wrap">
+                <table class="ui-table">
+                    <thead>
                         <tr>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Invoice
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Customer
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Billing period
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Subtotal
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Total
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Status
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Issued
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Actions
-                            </th>
+                            <th>Invoice</th>
+                            <th>Customer</th>
+                            <th>Billing period</th>
+                            <th class="ui-table-num">Subtotal</th>
+                            <th class="ui-table-num">Total</th>
+                            <th>Status</th>
+                            <th>Issued</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody>
                         <tr v-for="inv in invoices" :key="inv.id">
-                            <td class="px-6 py-4 font-mono text-xs text-gray-700">
-                                {{ inv.id }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-900">
-                                {{ inv.customer?.name ?? '—' }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">
+                            <td class="font-mono text-xs text-slate-600">{{ inv.id }}</td>
+                            <td class="ui-table-primary">{{ inv.customer?.name ?? '—' }}</td>
+                            <td class="whitespace-nowrap text-slate-600">
                                 {{ formatDate(inv.billing_period_start) }} —
                                 {{ formatDate(inv.billing_period_end) }}
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
-                                {{ formatMoney(inv.subtotal) }}
-                            </td>
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                            <td class="ui-table-num">{{ formatMoney(inv.subtotal) }}</td>
+                            <td class="ui-table-num font-medium text-slate-900">
                                 {{ formatMoney(inv.total) }}
                             </td>
-                            <td class="px-6 py-4 text-sm capitalize text-gray-700">
-                                {{ inv.status }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">
+                            <td class="capitalize">{{ inv.status }}</td>
+                            <td class="text-slate-500">
                                 {{ inv.issued_at ? formatDate(inv.issued_at) : '—' }}
                             </td>
-                            <td class="px-6 py-4 text-sm">
+                            <td>
                                 <router-link
                                     :to="{ name: 'invoices.show', params: { id: inv.id } }"
-                                    class="text-blue-600 hover:text-blue-800"
+                                    class="ui-link"
                                 >
                                     View
                                 </router-link>
@@ -111,39 +66,18 @@
                 </table>
             </div>
 
-            <div
-                v-if="meta && meta.last_page > 1"
-                class="mt-4 flex items-center justify-between text-sm text-gray-600"
-            >
-                <span
-                    >Page {{ meta.current_page }} of {{ meta.last_page }} ({{
-                        meta.total
-                    }}
-                    invoices)</span
-                >
-                <div class="space-x-2">
-                    <button
-                        :disabled="meta.current_page <= 1"
-                        class="rounded border px-3 py-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        @click="loadInvoices(meta.current_page - 1)"
-                    >
-                        Previous
-                    </button>
-                    <button
-                        :disabled="meta.current_page >= meta.last_page"
-                        class="rounded border px-3 py-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        @click="loadInvoices(meta.current_page + 1)"
-                    >
-                        Next
-                    </button>
-                </div>
-            </div>
-        </div>
+            <UiPagination :meta="meta" label="invoices" @change="loadInvoices" />
+        </template>
     </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import UiAlert from '@/components/UiAlert.vue';
+import UiEmpty from '@/components/UiEmpty.vue';
+import UiLoading from '@/components/UiLoading.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
+import UiPagination from '@/components/UiPagination.vue';
 import * as invoicesApi from '@/api/invoices';
 import type { InvoiceData } from '@/types/invoices';
 import type { PaginatedResponse } from '@/types/plans';

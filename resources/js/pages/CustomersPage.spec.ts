@@ -82,7 +82,7 @@ describe('CustomersPage', () => {
 
         await flushPromises();
 
-        expect(wrapper.find('input[type="text"]').exists()).toBe(true);
+        expect(wrapper.find('input[type="search"]').exists()).toBe(true);
         expect(wrapper.find('select').exists()).toBe(true);
     });
 });

@@ -1,98 +1,95 @@
 <template>
-    <div>
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-800">Subscription Detail</h2>
-            <router-link
-                :to="{ name: 'subscriptions.index' }"
-                class="text-gray-600 hover:text-gray-800 text-sm"
-            >
-                ← Back to list
-            </router-link>
-        </div>
+    <div class="ui-page">
+        <UiPageHeader title="Subscription Detail">
+            <template #actions>
+                <router-link :to="{ name: 'subscriptions.index' }" class="ui-link-muted">
+                    ← Back to list
+                </router-link>
+            </template>
+        </UiPageHeader>
 
-        <div
-            v-if="error"
-            class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4"
-        >
-            {{ error }}
-        </div>
-
-        <div v-if="loading" class="text-gray-500 text-sm">Loading…</div>
+        <UiAlert v-if="error">{{ error }}</UiAlert>
+        <UiLoading v-if="loading" />
 
         <div v-else-if="sub" class="space-y-6">
-            <div class="bg-white shadow rounded-lg p-6 grid grid-cols-2 gap-4 text-sm">
-                <div>
-                    <span class="font-medium text-gray-500">Customer:</span>
-                    {{ sub.customer?.name }}
-                </div>
-                <div><span class="font-medium text-gray-500">Plan:</span> {{ sub.plan?.name }}</div>
-                <div>
-                    <span class="font-medium text-gray-500">Status:</span>
-                    <span
-                        class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                        :class="
-                            sub.status === 'active'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                        "
-                    >
-                        {{ sub.status }}
-                    </span>
-                </div>
-                <div>
-                    <span class="font-medium text-gray-500">Billing Cycle:</span>
-                    {{ sub.billing_cycle }}
-                </div>
-                <div>
-                    <span class="font-medium text-gray-500">Base Price:</span>
-                    {{ formatMoney(sub.base_price) }}
-                </div>
-                <div>
-                    <span class="font-medium text-gray-500">Included Units:</span>
-                    {{ sub.included_usage_units.toLocaleString() }}
-                </div>
-                <div>
-                    <span class="font-medium text-gray-500">Overage Rate:</span>
-                    {{ formatMoney(sub.overage_rate) }}/unit
-                </div>
-                <div>
-                    <span class="font-medium text-gray-500">Started:</span>
-                    {{ formatDate(sub.started_at) }}
-                </div>
-                <div>
-                    <span class="font-medium text-gray-500">Current Period:</span>
-                    {{ formatDate(sub.current_period_start) }} —
-                    {{ formatDate(sub.current_period_end) }}
-                </div>
-                <div v-if="sub.cancelled_at">
-                    <span class="font-medium text-gray-500">Cancelled:</span>
-                    {{ formatDate(sub.cancelled_at) }}
-                </div>
-            </div>
+            <section class="ui-card ui-card-body">
+                <dl class="ui-dl-grid">
+                    <div class="ui-dl-item">
+                        <dt>Customer</dt>
+                        <dd>{{ sub.customer?.name }}</dd>
+                    </div>
+                    <div class="ui-dl-item">
+                        <dt>Plan</dt>
+                        <dd>{{ sub.plan?.name }}</dd>
+                    </div>
+                    <div class="ui-dl-item">
+                        <dt>Status</dt>
+                        <dd>
+                            <UiBadge :variant="sub.status === 'active' ? 'success' : 'neutral'">
+                                {{ sub.status }}
+                            </UiBadge>
+                        </dd>
+                    </div>
+                    <div class="ui-dl-item">
+                        <dt>Billing cycle</dt>
+                        <dd class="capitalize">{{ sub.billing_cycle }}</dd>
+                    </div>
+                    <div class="ui-dl-item">
+                        <dt>Base price</dt>
+                        <dd>{{ formatMoney(sub.base_price) }}</dd>
+                    </div>
+                    <div class="ui-dl-item">
+                        <dt>Included units</dt>
+                        <dd>{{ sub.included_usage_units.toLocaleString() }}</dd>
+                    </div>
+                    <div class="ui-dl-item">
+                        <dt>Overage rate</dt>
+                        <dd>{{ formatMoney(sub.overage_rate) }}/unit</dd>
+                    </div>
+                    <div class="ui-dl-item">
+                        <dt>Started</dt>
+                        <dd>{{ formatDate(sub.started_at) }}</dd>
+                    </div>
+                    <div class="ui-dl-item">
+                        <dt>Current period</dt>
+                        <dd>
+                            {{ formatDate(sub.current_period_start) }} —
+                            {{ formatDate(sub.current_period_end) }}
+                        </dd>
+                    </div>
+                    <div v-if="sub.cancelled_at" class="ui-dl-item">
+                        <dt>Cancelled</dt>
+                        <dd>{{ formatDate(sub.cancelled_at) }}</dd>
+                    </div>
+                </dl>
+            </section>
 
             <div v-if="isOwner" class="flex flex-wrap items-center gap-3">
                 <button
                     v-if="billingPeriodEnded"
+                    type="button"
+                    class="ui-btn-success"
                     :disabled="generatingInvoice"
-                    class="bg-emerald-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-emerald-700 disabled:opacity-50"
                     @click="handleGenerateInvoice"
                 >
                     {{ generatingInvoice ? 'Generating…' : 'Generate invoice' }}
                 </button>
-                <p v-else class="text-sm text-gray-500">
+                <p v-else class="text-sm text-slate-500">
                     Invoice generation is available after the current billing period ends ({{
                         formatDate(sub.current_period_end)
                     }}).
                 </p>
                 <template v-if="sub.status === 'active'">
                     <button
-                        class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700"
+                        type="button"
+                        class="ui-btn-primary"
                         @click="showChangePlan = !showChangePlan"
                     >
                         Change Plan
                     </button>
                     <button
-                        class="bg-red-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-red-700"
+                        type="button"
+                        class="ui-btn-secondary text-red-600 hover:bg-red-50"
                         @click="handleCancel"
                     >
                         Cancel Subscription
@@ -100,94 +97,62 @@
                 </template>
             </div>
 
-            <div
-                v-if="invoiceSuccessId"
-                class="rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
-            >
+            <UiAlert v-if="invoiceSuccessId" variant="success">
                 Invoice created.
                 <router-link
                     :to="{ name: 'invoices.show', params: { id: invoiceSuccessId } }"
-                    class="font-medium text-green-900 underline"
+                    class="font-semibold underline"
                 >
                     View invoice
                 </router-link>
-            </div>
+            </UiAlert>
 
-            <div v-if="showChangePlan" class="bg-white shadow rounded-lg p-6 max-w-md">
-                <h3 class="text-lg font-semibold mb-3">Change Plan</h3>
-                <select
-                    v-model="targetPlanId"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3"
-                >
+            <section v-if="showChangePlan" class="ui-card ui-card-body max-w-md">
+                <h3 class="ui-card-title mb-4">Change Plan</h3>
+                <select v-model="targetPlanId" class="ui-select mb-4">
                     <option value="">Select new plan…</option>
                     <option v-for="p in plans" :key="p.id" :value="p.id">
                         {{ p.name }} — {{ formatMoney(p.base_price) }}/{{ p.billing_cycle }}
                     </option>
                 </select>
                 <button
+                    type="button"
+                    class="ui-btn-primary"
                     :disabled="!targetPlanId || changing"
-                    class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700 disabled:opacity-50"
                     @click="handleChangePlan"
                 >
                     {{ changing ? 'Changing…' : 'Confirm Change' }}
                 </button>
-            </div>
+            </section>
 
-            <div v-if="sub.plan_changes && sub.plan_changes.length > 0">
-                <h3 class="text-lg font-semibold text-gray-800 mb-3">Plan Change History</h3>
-                <div class="bg-white shadow rounded-lg overflow-hidden">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th
-                                    class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
-                                >
-                                    Date
-                                </th>
-                                <th
-                                    class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
-                                >
-                                    From
-                                </th>
-                                <th
-                                    class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
-                                >
-                                    To
-                                </th>
-                                <th
-                                    class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
-                                >
-                                    Old Price
-                                </th>
-                                <th
-                                    class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
-                                >
-                                    New Price
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                            <tr v-for="ch in sub.plan_changes" :key="ch.id">
-                                <td class="px-4 py-2 text-gray-700">
-                                    {{ formatDate(ch.effective_at) }}
-                                </td>
-                                <td class="px-4 py-2 text-gray-700">
-                                    {{ ch.from_plan?.name ?? '—' }}
-                                </td>
-                                <td class="px-4 py-2 text-gray-700">
-                                    {{ ch.to_plan?.name ?? '—' }}
-                                </td>
-                                <td class="px-4 py-2 text-gray-700">
-                                    {{ formatMoney(ch.from_base_price) }}
-                                </td>
-                                <td class="px-4 py-2 text-gray-700">
-                                    {{ formatMoney(ch.to_base_price) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <section
+                v-if="sub.plan_changes && sub.plan_changes.length > 0"
+                class="ui-card ui-card-body-flush"
+            >
+                <div class="ui-card-header">
+                    <h3 class="ui-card-title">Plan Change History</h3>
                 </div>
-            </div>
+                <table class="ui-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th class="ui-table-num">Old Price</th>
+                            <th class="ui-table-num">New Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="ch in sub.plan_changes" :key="ch.id">
+                            <td>{{ formatDate(ch.effective_at) }}</td>
+                            <td>{{ ch.from_plan?.name ?? '—' }}</td>
+                            <td>{{ ch.to_plan?.name ?? '—' }}</td>
+                            <td class="ui-table-num">{{ formatMoney(ch.from_base_price) }}</td>
+                            <td class="ui-table-num">{{ formatMoney(ch.to_base_price) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
         </div>
     </div>
 </template>
@@ -196,6 +161,10 @@
 import axios from 'axios';
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
+import UiAlert from '@/components/UiAlert.vue';
+import UiBadge from '@/components/UiBadge.vue';
+import UiLoading from '@/components/UiLoading.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
 import { useAuth } from '@/composables/useAuth';
 import * as subsApi from '@/api/subscriptions';
 import * as plansApi from '@/api/plans';
