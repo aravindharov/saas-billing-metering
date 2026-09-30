@@ -3,9 +3,65 @@
 A multi-tenant SaaS backend that supports merchants, plans, customer
 subscriptions, usage-event ingestion, aggregation, and invoice generation.
 
-> **Current phase: 9 — Performance, Security & Production Hardening**
+> **Phase 10 — Final assignment review & submission materials**
 
-Architecture, 50L+ usage strategy, indexes, caching, and idempotency: **[docs/architecture.md](docs/architecture.md)**.
+## Overview
+
+Multi-tenant SaaS backend: merchants define **plans**, **customers** subscribe with **pricing snapshots**, **usage events** are ingested at volume with idempotency, **daily usage** is aggregated asynchronously, **invoices** are generated from segments (proration + overage), and a **merchant dashboard** reads the daily read model.
+
+**Detailed docs:** [Architecture](docs/architecture.md) · [Assumptions](docs/assumptions.md) · [Assignment audit](docs/assignment-checklist.md) · [Demo script](docs/demo-script.md) · [Final review](docs/final-review.md) · [AI prompts](prompts/)
+
+## Core domain model
+
+```
+Plans → Subscription (pricing snapshot) → Plan-change history
+Usage events (append-only) → Daily usage (read model)
+Daily usage + segments → Billing calculator → Invoices
+Daily usage → Dashboard analytics
+```
+
+## Features
+
+- Sanctum auth with merchant tenancy (owner / member roles)
+- Plans, customers, subscriptions (create, change plan, cancel)
+- Usage ingest (`POST /api/v1/usage`), daily usage API and UI
+- Billing engine, invoices (API, UI, artisan command, owner generate button)
+- Dashboard: top 5 MTD usage, projected overage, >50% MoM drop
+- Redis plan cache (merchant-scoped), rate limits, security regression tests
+
+## API endpoints (summary)
+
+All paths prefixed with `/api/v1`. Protected routes require `Authorization: Bearer <token>` and tenant middleware.
+
+| Area | Method | Path |
+|------|--------|------|
+| Health | GET | `/api/health` |
+| Auth | POST | `/auth/login`, `/auth/logout` |
+| Auth | GET | `/auth/me` |
+| Plans | * | `/plans`, `/plans/{plan}` (REST) |
+| Customers | * | `/customers`, `/customers/{customer}` (REST) |
+| Subscriptions | GET, POST | `/subscriptions`, `/subscriptions/{subscription}` |
+| Subscriptions | POST | `/subscriptions/{subscription}/change-plan`, `/cancel`, `/generate-invoice` |
+| Usage | POST | `/usage` |
+| Usage | GET | `/usage/daily` |
+| Invoices | GET | `/invoices`, `/invoices/{invoice}` |
+| Dashboard | GET | `/merchants/{merchant}/dashboard` |
+
+Request/response examples for auth, plans, customers, subscriptions, usage, and invoices are documented below in this README.
+
+## Verification (local)
+
+Last run via `make verify` on branch `phase-10-final-review`:
+
+| Check | Result |
+|-------|--------|
+| Pint | PASS (176 files) |
+| Larastan | No errors |
+| vue-tsc | PASS |
+| ESLint / Prettier | PASS |
+| PHPUnit | **333 passed** (789 assertions) |
+| Vitest | **26 passed** (11 files) |
+| Vite production build | PASS |
 
 ---
 
@@ -52,8 +108,12 @@ docker compose up -d
 # Generate application key
 docker compose exec app php artisan key:generate
 
-# Run database migrations
+# Run database migrations and demo seed data
 docker compose exec app php artisan migrate
+docker compose exec app php artisan db:seed
+
+# Process queued aggregation/invoice jobs (or set QUEUE_CONNECTION=sync in .env)
+docker compose up -d queue
 
 # (Optional) Start the Vite dev server
 docker compose --profile frontend up -d vite
@@ -141,7 +201,17 @@ docker compose exec app php artisan migrate
 
 # Tinker (REPL)
 docker compose exec app php artisan tinker
+
+# Rebuild daily usage for a UTC date range (dispatches queue jobs)
+docker compose exec app php artisan usage:aggregate --from=2026-09-01 --to=2026-09-30
+
+# Queue invoice generation for ended billing periods
+docker compose exec app php artisan billing:generate-invoices
+# Optional: --before=2026-10-01T00:00:00Z
 ```
+
+**Aggregation:** Required after bulk imports or to repair late events; idempotent per `(merchant, customer, usage_date)`.  
+**Invoices:** Skips periods that already have an invoice; jobs are idempotent. Ensure `queue` is running unless using `sync`.
 
 ---
 
@@ -836,7 +906,7 @@ Archived plans remain in the database for historical references. They are not av
 
 ### Pricing History Note
 
-When subscriptions are implemented (future phase), the subscription/invoice must preserve the pricing applicable at the time of subscription or plan change. The current plan price may be edited freely; a future subscription/pricing snapshot mechanism will ensure historical billing integrity.
+Subscriptions and invoices use **pricing snapshots** on the subscription row and **plan-change history** — editing a plan does not alter existing subscriptions or past segments.
 
 ---
 
@@ -924,219 +994,40 @@ Implemented via `UsageEventPolicy::viewDailyUsage`.
 - **Money as integers** — All monetary values use integer minor units with explicit currency.
 - **Multi-tenant** — Every query is scoped to the authenticated merchant.
 - **UTC timestamps** — All dates stored in UTC; display formatting at the edge.
-- **Idempotency** — Critical write operations will use idempotency keys.
+- **Idempotency** — Usage `event_id` and invoice period uniqueness enforced in the database.
 - **No secrets in code** — All credentials live in environment variables.
 
 ---
 
-## Implementation Status
+## AI-assisted development
 
-### ✅ Implemented (Phase 0 — Foundation)
+- Implementation was done **phase-by-phase** with structured prompts (see [`prompts/`](prompts/)).
+- Generated code was **reviewed** against assignment scope; business rules live in Actions/Services with PHPUnit coverage.
+- **Static analysis** (Pint, Larastan, vue-tsc, ESLint) runs locally and in CI.
+- **Tenant isolation** and authorization were checked explicitly (feature + security tests).
+- Architectural trade-offs (50L+ pipeline, partitioning deferral, money as integers) are documented in [`docs/architecture.md`](docs/architecture.md) and [`docs/assumptions.md`](docs/assumptions.md).
 
-- [x] Fresh Laravel 13 project
-- [x] Docker Compose (app, queue, scheduler, MySQL, Redis, Vite)
-- [x] MySQL 8.4 with test database
-- [x] Redis 7.4 for cache and queues
-- [x] Health check endpoint (`GET /api/health`)
-- [x] SPA shell (Vue 3 + TypeScript + Tailwind)
-- [x] PHPUnit + Vitest test infrastructure
-- [x] Larastan, Pint, ESLint, Prettier
-- [x] GitHub Actions CI
-- [x] Makefile shortcuts
-
-### ✅ Implemented (Phase 1 — Authentication & Tenancy)
-
-- [x] Merchant model with ULID public IDs, slug, status
-- [x] User model with merchant relationship, role (owner/member)
-- [x] Per-merchant email uniqueness (tenant-local identity)
-- [x] Laravel Sanctum token authentication
-- [x] `POST /api/v1/auth/login` — authenticate by merchant slug + email + password
-- [x] `POST /api/v1/auth/logout` — revoke current token
-- [x] `GET /api/v1/auth/me` — current user + merchant context
-- [x] `MerchantContext` — tenant resolution from authenticated identity
-- [x] `ResolveMerchant` middleware — enforces tenant context on protected routes
-- [x] Opaque auth error responses (no credential leakage)
-- [x] Suspended merchant blocking
-- [x] Login rate limiting (5 attempts/minute)
-- [x] Vue login page with merchant/email/password form
-- [x] Auth composable with reactive state management
-- [x] Vue Router guards (protected routes + guest routes)
-- [x] Authenticated layout with merchant name, user, role, logout
-- [x] Database factories (Merchant, User with owner/member states)
-- [x] Development seeder (Acme Corporation with owner + member)
-- [x] 49 backend tests (121 assertions)
-- [x] 9 frontend tests
-
-### ✅ Implemented (Phase 2 — Plans & Pricing)
-
-- [x] Plan model with ULID public IDs, merchant relationship
-- [x] BillingCycle enum (monthly, yearly)
-- [x] PlanStatus enum (active, archived)
-- [x] `POST /api/v1/plans` — create plan (owner only)
-- [x] `GET /api/v1/plans` — list plans with pagination and status filter
-- [x] `GET /api/v1/plans/{plan}` — show plan
-- [x] `PUT /api/v1/plans/{plan}` — update plan (owner only)
-- [x] `DELETE /api/v1/plans/{plan}` — archive plan (owner only, soft-delete)
-- [x] Money as integer minor units (base_price, overage_rate)
-- [x] Plan name uniqueness per merchant
-- [x] PlanPolicy for role-based authorization (owner=full, member=read-only)
-- [x] Tenant-scoped route model binding (cross-tenant → 404, no info leakage)
-- [x] Plan caching with Redis (merchant-scoped keys, invalidation on write)
-- [x] Vue Plans list page with pagination, status filter, archive action
-- [x] Vue Plan create/edit form page
-- [x] Nav link in authenticated layout
-- [x] Database factory with active/archived/monthly/yearly states
-- [x] Development seeder (Starter, Professional, Enterprise plans)
-- [x] 57 new backend tests
-- [x] 5 new frontend tests
-
-### ✅ Implemented (Phase 3 — Customers)
-
-- [x] Customer model with ULID public IDs, merchant relationship
-- [x] CustomerStatus enum (active, inactive)
-- [x] `POST /api/v1/customers` — create customer (owner only)
-- [x] `GET /api/v1/customers` — list with pagination, status filter, search
-- [x] `GET /api/v1/customers/{customer}` — show customer
-- [x] `PUT /api/v1/customers/{customer}` — update customer (owner only)
-- [x] `DELETE /api/v1/customers/{customer}` — deactivate customer (owner only, soft-delete)
-- [x] External reference (optional, unique per merchant)
-- [x] Search by name, email, external reference
-- [x] CustomerPolicy for role-based authorization (owner=full, member=read-only)
-- [x] Tenant-scoped route model binding (cross-tenant → 404)
-- [x] Vue Customers list page with pagination, search, status filter
-- [x] Vue Customer create/edit form page
-- [x] Nav link in authenticated layout
-- [x] Database factory with active/inactive/withExternalReference states
-- [x] Development seeder (John Smith, Jane Doe, Bob Wilson)
-- [x] 49 new backend tests
-- [x] 5 new frontend tests
-
-### ✅ Implemented (Phase 4 — Subscriptions & Plan Changes)
-
-- [x] Subscription model with ULID public IDs, tenant scoping
-- [x] SubscriptionStatus enum (active, cancelled, expired)
-- [x] Pricing snapshot — plan pricing copied into subscription at creation time
-- [x] `POST /api/v1/subscriptions` — create subscription (owner only)
-- [x] `GET /api/v1/subscriptions` — list with pagination, status/customer/plan filters
-- [x] `GET /api/v1/subscriptions/{subscription}` — show with plan change history
-- [x] `POST /api/v1/subscriptions/{subscription}/change-plan` — mid-cycle plan change (owner only)
-- [x] `POST /api/v1/subscriptions/{subscription}/cancel` — cancel subscription (owner only)
-- [x] Plan change history with from/to pricing snapshots (SubscriptionPlanChange model)
-- [x] One active subscription per customer constraint
-- [x] DB transactions with row-level locks for concurrency protection
-- [x] Calendar-aware billing periods (addMonth/addYear)
-- [x] SubscriptionPolicy for role-based authorization
-- [x] Tenant-scoped route model binding (cross-tenant → 404)
-- [x] Vue Subscriptions list page with pagination and status filter
-- [x] Vue Subscription detail page with plan change history
-- [x] Vue Create Subscription page with customer/plan selectors
-- [x] Nav link in authenticated layout
-- [x] Database factories with cancelled/expired/yearly states
-- [x] Development seeder (John Smith subscribed to Starter)
-- [x] Backend tests: create, list, show, change plan, cancel, model, tenant isolation
-- [x] Frontend tests
-
-### ✅ Implemented (Phase 5 — Usage Event Ingestion)
-
-- [x] UsageEvent model with ULID public IDs, tenant scoping
-- [x] `POST /api/v1/usage` — ingest usage event (any authenticated user)
-- [x] Client-generated `event_id` as idempotency key
-- [x] `UNIQUE(merchant_id, event_id)` database constraint — final authority against duplicates
-- [x] Idempotent retry: duplicate `event_id` returns existing event (HTTP 200), no duplicate record
-- [x] Concurrent duplicate protection via `UniqueConstraintViolationException` catch
-- [x] Customer validation: must exist, belong to merchant, be active
-- [x] Subscription validation: must exist, belong to merchant and customer, be active
-- [x] UTC timestamp storage, ISO-8601 input, timezone normalization
-- [x] Late event support: historical `occurred_at` accepted
-- [x] Future event rejection: > 5 minutes clock-skew tolerance
-- [x] Quantity: positive integer, 1–1,000,000
-- [x] Merchant-scoped rate limiting: 500 requests/minute per merchant (HTTP 429)
-- [x] Immutable events: no PUT/PATCH/DELETE endpoints
-- [x] Lightweight write path: no synchronous aggregation or billing
-- [x] Indexes optimized for high write volume and future aggregation queries
-- [x] UsageEventPolicy for authorization
-- [x] Database factory with merchant/customer/subscription/historical states
-- [x] Development seeder (5 sample usage events for John Smith)
-- [x] 38 backend tests across 5 test files
-- [x] 50L+ scaling strategy documented
-
-### ✅ Implemented (Phase 6 — Daily Usage Aggregation)
-
-- [x] `daily_usage` table with `UNIQUE(merchant_id, customer_id, usage_date)`
-- [x] DailyUsage model (internal read model, no public API id)
-- [x] `AggregateDailyUsage` queued job — SUM from raw events, upsert SET total
-- [x] Idempotent aggregation — retries and concurrent jobs cannot double-count
-- [x] UTC usage date from `occurred_at` (half-open day window)
-- [x] Late events recompute the affected UTC date only
-- [x] Job dispatched after commit on new usage events only
-- [x] `php artisan usage:aggregate --from --to` rebuild with chunked GROUP BY
-- [x] `GET /api/v1/usage/daily` — date, range (max 366 days), customer filter, pagination
-- [x] Tenant isolation via MerchantContext
-- [x] Vue Daily Usage page (date filter, table, pagination)
-- [x] 30+ backend tests (aggregation, idempotency, late events, API, command)
-- [x] 50L+ architecture documentation updated
-
-### ✅ Implemented (Phase 7 — Billing & Invoices)
-
-- [x] `invoices` and `invoice_lines` tables (integer minor units, unique subscription + billing period)
-- [x] `BillingSegmentBuilder` + `BillingCalculator` (segments, proration, per-segment overage from `daily_usage`)
-- [x] `GenerateInvoice` action (transactional, idempotent, issued immediately)
-- [x] `GenerateSubscriptionInvoice` queued job + `billing:generate-invoices` command (`chunkById`)
-- [x] Historical pricing via subscription snapshot and `subscription_plan_changes` (not live plan prices)
-- [x] `GET /api/v1/invoices`, `GET /api/v1/invoices/{invoice}` — filters, pagination, tenant scope
-- [x] `InvoicePolicy` (read-only for owners and members)
-- [x] Vue invoice list and detail pages
-- [x] 17+ backend tests (calculator, generation, API, command, idempotency, tenant isolation)
-- [x] Billing formula, proration, and rounding documented in `docs/assumptions.md`
-
-**Billing formula (per segment):**  
-`total = Σ prorated_base + Σ max(0, usage − included) × overage_rate`  
-**Proration:** `intdiv(base × segment_seconds + period_seconds/2, period_seconds)` (round half up).
-
-### ✅ Implemented (Phase 8 — Merchant Dashboard & Analytics)
-
-- [x] `GET /api/v1/merchants/{merchant}/dashboard` — tenant-scoped analytics
-- [x] Top 5 customers by current UTC month usage (`daily_usage`)
-- [x] Projected overage revenue for active billing cycles (segment pricing + linear projection)
-- [x] Customers with >50% month-over-month usage drop (fair month-to-date windows)
-- [x] Vue home dashboard with summary cards, tables, loading/empty/error states
-- [x] Backend + frontend tests; no raw `usage_events` scans on dashboard path
-
-### ✅ Implemented (Phase 9 — Performance & Security Hardening)
-
-- [x] Architecture doc: 50L+ pipeline, indexes, chunking, queues, partitioning deferral
-- [x] Aggregation index `(merchant_id, customer_id, occurred_at)` on `usage_events`
-- [x] Cross-tenant security regression tests (plans, customers, subscriptions, invoices, dashboard)
-- [x] Input hardening tests (untrusted `merchant_id`, subscription pricing snapshot)
-- [x] Lightweight logging on duplicate usage, aggregation/billing job failures
-- [x] Production notes (`APP_DEBUG=false`) in `.env.example`
-
-### 🔲 Out of assignment scope
-
-- [ ] Payment processing, refunds, credit notes, dunning, taxes
-- [ ] Optional dashboard response cache
-- [ ] Database partitioning (documented as future — see `docs/architecture.md`)
+Prompt log format: markdown transcripts (`PROMPT.md` / `FOLLOWUPS.md` per phase), not fabricated artifacts.
 
 ---
 
-## Assignment requirement checklist
+## Assignment checklist
+
+Full audit with evidence links: **[docs/assignment-checklist.md](docs/assignment-checklist.md)**.
+
+Summary:
 
 | Requirement | Status |
 |-------------|--------|
-| Plans | ✅ |
-| Customers | ✅ |
-| Subscriptions | ✅ |
-| Usage events + `POST /usage` | ✅ |
-| Idempotency (`event_id` + DB unique) | ✅ |
-| Rate limiting (500/min/merchant) | ✅ |
-| High-volume / 50L+ strategy | ✅ [docs/architecture.md](docs/architecture.md) |
-| Daily aggregation | ✅ |
-| Billing + overage + proration | ✅ |
-| Mid-cycle plan changes + historical pricing | ✅ |
-| Invoice generation + idempotency | ✅ |
-| Dashboard (top 5, projected overage, >50% drop) | ✅ |
-| Tenant isolation | ✅ |
-| Plan caching (merchant-scoped) | ✅ |
-| Tests + static analysis | ✅ CI |
-| Documentation | ✅ README, assumptions, architecture |
-| AI prompt log | ✅ [prompts/](prompts/) |
+| Plans, customers, subscriptions | ✅ |
+| Usage + idempotency + rate limits | ✅ |
+| Daily aggregation + rebuild | ✅ |
+| Billing, invoices, dashboard | ✅ |
+| 50L+ / performance strategy | ✅ |
+| Tests + CI quality gates | ✅ |
+| Documentation + demo | ✅ |
+| AI prompt log | ✅ [`prompts/`](prompts/) |
+
+**Out of scope:** payments, taxes, refunds, dunning, partitioning implementation (documented only).
+
+**Demo walkthrough:** [docs/demo-script.md](docs/demo-script.md) · **Submission notes:** [docs/final-review.md](docs/final-review.md)
