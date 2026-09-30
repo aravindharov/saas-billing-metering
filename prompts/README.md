@@ -26,7 +26,8 @@ prompts/
 ├── phase-06-daily-aggregation/
 ├── phase-07-billing-invoices/
 ├── phase-08-dashboard-analytics/
-└── phase-09-performance-security/
+├── phase-09-performance-security/
+└── phase-10-final-review/
 ```
 
 ## Phase ↔ README mapping
@@ -43,3 +44,4 @@ prompts/
 | `phase-07-billing-invoices` | Phase 7 — Billing & Invoices |
 | `phase-08-dashboard-analytics` | Phase 8 — Merchant Dashboard & Analytics |
 | `phase-09-performance-security` | Phase 9 — Performance & Security Hardening |
+| `phase-10-final-review` | Phase 10 — Final assignment review |
