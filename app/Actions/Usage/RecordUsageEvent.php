@@ -12,6 +12,7 @@ use App\Models\UsageEvent;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 final class RecordUsageEvent
@@ -41,6 +42,11 @@ final class RecordUsageEvent
             ->first();
 
         if ($existing) {
+            Log::debug('usage.duplicate_event_idempotent', [
+                'merchant_id' => $merchant->id,
+                'event_id' => $eventId,
+            ]);
+
             return [$existing, false];
         }
 
@@ -76,6 +82,11 @@ final class RecordUsageEvent
             $existing = UsageEvent::where('merchant_id', $merchant->id)
                 ->where('event_id', $eventId)
                 ->firstOrFail();
+
+            Log::info('usage.duplicate_event_concurrent', [
+                'merchant_id' => $merchant->id,
+                'event_id' => $eventId,
+            ]);
 
             return [$existing, false];
         }

@@ -1,21 +1,14 @@
 # Scalability Decisions
 
-This document records scalability-related decisions as required by the
-assignment. It will be expanded as business features are implemented.
+> **Canonical reference:** see [architecture.md](./architecture.md) for the full
+> 50L+ usage pipeline, index strategy, caching, and partitioning deferral.
 
-## Foundation
+This file remains as a short pointer for assignment reviewers.
 
-| Concern | Approach | Notes |
-|---------|----------|-------|
-| **Queue backend** | Redis | Supports high-throughput job processing. Usage aggregation will use chunked/batched jobs. |
-| **Cache backend** | Redis | Low-latency reads for dashboard data and rate-limit counters. |
-| **Rate limiting** | Redis-backed Laravel rate limiter | Protects usage ingestion endpoints from abuse. |
-| **Database** | MySQL 8.4 with InnoDB | ACID-compliant, supports row-level locking for concurrent writes. |
-| **Idempotency** | Planned via unique constraints and idempotency keys | Will be implemented in the usage ingestion phase. |
-
-## Future Considerations
-
-- Horizontal scaling of queue workers for usage aggregation
-- Read replicas for dashboard queries
-- Table partitioning for high-volume usage events
-- Connection pooling for database connections under load
+| Concern | Approach |
+|---------|----------|
+| Usage at scale | Append-only `usage_events`, indexed aggregation, `daily_usage` read model |
+| Queues | Redis workers; chunked rebuild and billing commands |
+| Rate limiting | 500 req/min/merchant on `POST /usage` |
+| Plan cache | Merchant-scoped keys, TTL + invalidation on write |
+| Partitioning | Documented future strategy only — not implemented |

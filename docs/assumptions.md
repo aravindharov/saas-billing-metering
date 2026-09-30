@@ -136,6 +136,17 @@ reader might question.
 | 6 | **No dashboard cache (initially)** | Responses are computed on each request. Acceptable for assignment scale; merchant-scoped cache with short TTL can be added later without changing the API contract. |
 | 7 | **Indexes** | Existing `(merchant_id, usage_date)` on `daily_usage` supports month-range aggregates; no new indexes added in this phase. |
 
+## Phase 9 — Performance, Security & Production Hardening
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **No partitioning in code** | 50L+ handling uses append-only events, targeted indexes, queued aggregation, and `daily_usage`. Time-based partitioning is documented as a future ops step in `docs/architecture.md`. |
+| 2 | **One new usage_events index** | `(merchant_id, customer_id, occurred_at)` matches `AggregateDailyUsage` SUM queries; avoids full customer or merchant scans when rebuilding a single day. |
+| 3 | **Dashboard remains uncached** | Phase 8 decision retained; per-request SQL on `daily_usage` is sufficient for assignment scope. |
+| 4 | **Cross-tenant 404** | Scoped route binding + policies; security regression tests added for major resources. |
+| 5 | **Lightweight logging only** | Duplicate usage and failed queue jobs log context without tokens or PII beyond ids. |
+| 6 | **APP_DEBUG** | Production must run with `APP_DEBUG=false`; documented in `.env.example`. |
+
 ### Worked example (assignment)
 
 Plan: base ₹500 (50_000 paise), included 1_000 units, overage ₹2/unit (200 paise). Usage 1_500 in one period, no plan change:

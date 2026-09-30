@@ -11,6 +11,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 final class GenerateSubscriptionInvoice implements ShouldQueue
 {
@@ -33,5 +35,13 @@ final class GenerateSubscriptionInvoice implements ShouldQueue
         }
 
         $action->execute($subscription);
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::warning('billing.invoice_job_failed', [
+            'subscription_id' => $this->subscriptionId,
+            'message' => $exception->getMessage(),
+        ]);
     }
 }
