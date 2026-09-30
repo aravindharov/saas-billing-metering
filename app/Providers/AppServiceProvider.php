@@ -6,11 +6,13 @@ namespace App\Providers;
 
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\Merchant;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageEvent;
 use App\Policies\CustomerPolicy;
 use App\Policies\InvoicePolicy;
+use App\Policies\MerchantPolicy;
 use App\Policies\PlanPolicy;
 use App\Policies\SubscriptionPolicy;
 use App\Policies\UsageEventPolicy;
@@ -33,6 +35,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         Model::shouldBeStrict(! $this->app->isProduction());
 
+        Gate::policy(Merchant::class, MerchantPolicy::class);
         Gate::policy(Plan::class, PlanPolicy::class);
         Gate::policy(Customer::class, CustomerPolicy::class);
         Gate::policy(Subscription::class, SubscriptionPolicy::class);

@@ -124,6 +124,18 @@ reader might question.
 | 11 | **Authorization** | `InvoicePolicy`: owners and members may list/show invoices (read-only). Generation is server-side only (action/job/command). |
 | 12 | **No payments** | Payment gateway, refunds, credit notes, taxes, and dunning are out of scope. |
 
+## Phase 8 — Merchant Dashboard & Analytics
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **`daily_usage` read model** | Dashboard aggregates never scan `usage_events`. Totals are `SUM(total_quantity)` grouped by merchant/customer/date. Rebuild daily_usage from raw events if analytics drift. |
+| 2 | **Top 5 customers** | Current UTC calendar month from the 1st through today (inclusive), top 5 by summed usage. Customers without rows are omitted. |
+| 3 | **Projected overage revenue** | Sum over **active** subscriptions whose billing period contains “now”. Per pricing segment (same builder as billing): project usage with `intdiv(usage_so_far × segment_seconds + elapsed/2, elapsed)` then `max(0, projected − included) × overage_rate` in paise. Uses subscription/plan-change snapshots, not live plan catalog prices. **Estimate only — not an invoice.** |
+| 4 | **Usage drop detection** | Month-to-date vs previous month-to-date: current = `[month start, today]`; previous = `[previous month start, same day-of-month clamped to previous month length]`. Flag when `previous > 0` and `current × 2 < previous` (strictly >50% drop; exactly 50% excluded). |
+| 5 | **Tenant isolation** | `GET /api/v1/merchants/{merchant}/dashboard` resolves merchant via `MerchantContext` route binding (wrong merchant → 404). `MerchantPolicy::viewDashboard` requires matching `merchant_id`. |
+| 6 | **No dashboard cache (initially)** | Responses are computed on each request. Acceptable for assignment scale; merchant-scoped cache with short TTL can be added later without changing the API contract. |
+| 7 | **Indexes** | Existing `(merchant_id, usage_date)` on `daily_usage` supports month-range aggregates; no new indexes added in this phase. |
+
 ### Worked example (assignment)
 
 Plan: base ₹500 (50_000 paise), included 1_000 units, overage ₹2/unit (200 paise). Usage 1_500 in one period, no plan change:

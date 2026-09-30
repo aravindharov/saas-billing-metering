@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DailyUsageController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PlanController;
@@ -34,6 +35,9 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
         Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
+
+        Route::get('/merchants/{merchant}/dashboard', [DashboardController::class, 'show'])
+            ->name('merchants.dashboard');
 
         Route::apiResource('plans', PlanController::class);
         Route::apiResource('customers', CustomerController::class);
