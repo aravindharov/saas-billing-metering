@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\MerchantStatus;
+use App\Tenancy\MerchantContext;
 use Database\Factories\MerchantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -84,6 +85,15 @@ class Merchant extends Model
     public function getRouteKeyName(): string
     {
         return 'public_id';
+    }
+
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        $context = app(MerchantContext::class);
+
+        return $this->where($field ?? $this->getRouteKeyName(), $value)
+            ->when($context->resolved(), fn ($q) => $q->where('id', $context->id()))
+            ->first();
     }
 
     public function isActive(): bool

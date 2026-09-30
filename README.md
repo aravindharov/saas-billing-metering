@@ -674,6 +674,20 @@ See `docs/assumptions.md` (Phase 7) for formulas and a worked ₹1_500 example.
 
 ---
 
+## Phase 8 — Merchant Dashboard
+
+`GET /api/v1/merchants/{merchant}/dashboard` — `{merchant}` must be the authenticated tenant’s public id (cross-tenant → 404).
+
+| Section | Source |
+|---------|--------|
+| Top customers | `SUM(daily_usage)` for UTC month-to-date, limit 5 |
+| Projected overage | Active subscriptions, pricing segments, projected usage rate |
+| Usage drops | MoM month-to-date compare, threshold strictly >50% |
+
+See `docs/assumptions.md` (Phase 8) for projection and comparison formulas.
+
+---
+
 ## Scaling Usage Events Beyond 50L Rows
 
 The architecture separates **write-optimized ingestion** from **read-optimized aggregation**:
@@ -1077,9 +1091,17 @@ Implemented via `UsageEventPolicy::viewDailyUsage`.
 `total = Σ prorated_base + Σ max(0, usage − included) × overage_rate`  
 **Proration:** `intdiv(base × segment_seconds + period_seconds/2, period_seconds)` (round half up).
 
+### ✅ Implemented (Phase 8 — Merchant Dashboard & Analytics)
+
+- [x] `GET /api/v1/merchants/{merchant}/dashboard` — tenant-scoped analytics
+- [x] Top 5 customers by current UTC month usage (`daily_usage`)
+- [x] Projected overage revenue for active billing cycles (segment pricing + linear projection)
+- [x] Customers with >50% month-over-month usage drop (fair month-to-date windows)
+- [x] Vue home dashboard with summary cards, tables, loading/empty/error states
+- [x] Backend + frontend tests; no raw `usage_events` scans on dashboard path
+
 ### 🔲 Planned
 
 - [ ] Rate limiting on ingestion endpoints
-- [ ] Merchant dashboard
-- [ ] Caching layer for dashboard
+- [ ] Optional short-TTL dashboard cache
 - [ ] Payment processing & credit notes (out of assignment scope)
