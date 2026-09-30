@@ -39,4 +39,9 @@ final class SubscriptionPolicy
     {
         return $user->isOwner() && $user->merchant_id === $subscription->merchant_id;
     }
+
+    public function generateInvoice(User $user, Subscription $subscription): bool
+    {
+        return $user->isOwner() && $user->merchant_id === $subscription->merchant_id;
+    }
 }

@@ -106,3 +106,28 @@ reader might question.
 | 9 | **API date range capped at 366 days** | Prevents unbounded read queries. Default listing window is 31 days when no filter is provided. |
 | 10 | **No billing in aggregation** | This phase sums quantities only. Pricing, overage, and invoices belong to later phases. |
 | 11 | **Partitioning still deferred** | Same rationale as Phase 5 — indexes + async aggregation suffice until operational metrics justify partition complexity. |
+
+## Phase 7 — Billing & Invoices
+
+| # | Decision | Reasoning |
+|---|----------|-----------|
+| 1 | **Integer paise (minor units)** | `base_price`, `overage_rate`, invoice `subtotal`/`total`, and line amounts are unsigned integers in paise (₹1.00 = 100). Overage is `billable_units × overage_rate` with no floating point. |
+| 2 | **Billing read model** | Invoice generation sums `daily_usage.total_quantity` per customer and UTC date range. Raw `usage_events` are not scanned per invoice; rebuild aggregation if totals are wrong. |
+| 3 | **Pricing segments** | `BillingSegmentBuilder` splits `[current_period_start, current_period_end)` at each in-period `subscription_plan_changes.effective_at`. Pricing at segment start comes from plan-change history (`to_*` after a change, `from_*` before the first in-period change, else subscription snapshot). Live `plans` prices are never used for historical invoices. |
+| 4 | **Per-segment overage** | `billable = max(0, segment_usage − included_usage_units)`; segment usage is independent (no pooling across plan segments). |
+| 5 | **Time-based proration (base only)** | `prorated_base = intdiv(base × segment_seconds + intdiv(period_seconds, 2), period_seconds)` — round half up at the minor-unit step. Full-period segments charge the full snapshot base. |
+| 6 | **UTC boundaries** | Billing period timestamps and daily usage dates are interpreted in UTC. |
+| 7 | **Single currency** | No multi-currency model; one merchant currency is assumed (INR / paise in examples). |
+| 8 | **Invoice lifecycle** | Invoices are created and immediately **issued** (`status = issued`, `issued_at` set). No payment status. Issued invoices are immutable (no update/delete API). |
+| 9 | **Duplicate protection** | `UNIQUE(subscription_id, billing_period_start, billing_period_end)` plus transactional create and idempotent `GenerateInvoice` (returns existing row on retry). |
+| 10 | **Chunked cycle-end billing** | `billing:generate-invoices` uses `chunkById(100)` and dispatches `GenerateSubscriptionInvoice` per subscription; skips rows that already have an invoice for the current period. |
+| 11 | **Authorization** | `InvoicePolicy`: owners and members may list/show invoices (read-only). Generation is server-side only (action/job/command). |
+| 12 | **No payments** | Payment gateway, refunds, credit notes, taxes, and dunning are out of scope. |
+
+### Worked example (assignment)
+
+Plan: base ₹500 (50_000 paise), included 1_000 units, overage ₹2/unit (200 paise). Usage 1_500 in one period, no plan change:
+
+- Base line: 50_000  
+- Billable: 500 → overage 500 × 200 = 100_000  
+- **Total: 150_000 paise (₹1_500)**

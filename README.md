@@ -646,6 +646,34 @@ Both owners and members may view daily usage (`viewDailyUsage` on `UsageEventPol
 
 ---
 
+## Phase 7 — Billing & Invoices
+
+Cycle-end invoices are generated server-side (`GenerateInvoice`, `billing:generate-invoices`). Owners can also trigger generation from the subscription detail UI or via `POST /api/v1/subscriptions/{subscription}/generate-invoice` (idempotent, ended period only).
+
+### Invoice API
+
+`GET /api/v1/invoices` — paginated (15/page), tenant-scoped.
+
+| Query param | Description |
+|-------------|-------------|
+| `status` | `draft` or `issued` |
+| `customer_id` | Customer public ID |
+| `subscription_id` | Subscription public ID |
+| `period_from` / `period_to` | Filter on billing period dates (`Y-m-d`) |
+
+`GET /api/v1/invoices/{invoice}` — invoice with nested `lines` (types `base`, `overage`).
+
+### Billing engine
+
+1. Determine pricing segments from `subscription_plan_changes` within `[current_period_start, current_period_end)`.
+2. Sum `daily_usage` per segment (UTC dates, half-open `[segment_start, segment_end)`).
+3. Prorate base charge per segment; compute overage per segment independently.
+4. Persist invoice + lines in one transaction; duplicate periods rejected by DB unique index.
+
+See `docs/assumptions.md` (Phase 7) for formulas and a worked ₹1_500 example.
+
+---
+
 ## Scaling Usage Events Beyond 50L Rows
 
 The architecture separates **write-optimized ingestion** from **read-optimized aggregation**:
@@ -1032,10 +1060,26 @@ Implemented via `UsageEventPolicy::viewDailyUsage`.
 - [x] 30+ backend tests (aggregation, idempotency, late events, API, command)
 - [x] 50L+ architecture documentation updated
 
+### ✅ Implemented (Phase 7 — Billing & Invoices)
+
+- [x] `invoices` and `invoice_lines` tables (integer minor units, unique subscription + billing period)
+- [x] `BillingSegmentBuilder` + `BillingCalculator` (segments, proration, per-segment overage from `daily_usage`)
+- [x] `GenerateInvoice` action (transactional, idempotent, issued immediately)
+- [x] `GenerateSubscriptionInvoice` queued job + `billing:generate-invoices` command (`chunkById`)
+- [x] Historical pricing via subscription snapshot and `subscription_plan_changes` (not live plan prices)
+- [x] `GET /api/v1/invoices`, `GET /api/v1/invoices/{invoice}` — filters, pagination, tenant scope
+- [x] `InvoicePolicy` (read-only for owners and members)
+- [x] Vue invoice list and detail pages
+- [x] 17+ backend tests (calculator, generation, API, command, idempotency, tenant isolation)
+- [x] Billing formula, proration, and rounding documented in `docs/assumptions.md`
+
+**Billing formula (per segment):**  
+`total = Σ prorated_base + Σ max(0, usage − included) × overage_rate`  
+**Proration:** `intdiv(base × segment_seconds + period_seconds/2, period_seconds)` (round half up).
+
 ### 🔲 Planned
 
-- [ ] Billing & invoice generation
-- [ ] Proration for plan changes
 - [ ] Rate limiting on ingestion endpoints
 - [ ] Merchant dashboard
 - [ ] Caching layer for dashboard
+- [ ] Payment processing & credit notes (out of assignment scope)
