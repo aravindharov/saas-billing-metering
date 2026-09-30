@@ -51,7 +51,9 @@
                     {{ submitting ? 'Saving…' : isEdit ? 'Update Customer' : 'Create Customer' }}
                 </button>
                 <router-link :to="{ name: 'customers.index' }" class="ui-link-muted"
-                    >Cancel</router-link
+                    >
+Cancel
+</router-link
                 >
             </div>
         </form>
