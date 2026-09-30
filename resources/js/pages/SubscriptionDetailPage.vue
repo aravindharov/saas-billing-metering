@@ -70,19 +70,47 @@
                 </div>
             </div>
 
-            <div v-if="isOwner && sub.status === 'active'" class="flex items-center gap-3">
+            <div v-if="isOwner" class="flex flex-wrap items-center gap-3">
                 <button
-                    class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700"
-                    @click="showChangePlan = !showChangePlan"
+                    v-if="billingPeriodEnded"
+                    :disabled="generatingInvoice"
+                    class="bg-emerald-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-emerald-700 disabled:opacity-50"
+                    @click="handleGenerateInvoice"
                 >
-                    Change Plan
+                    {{ generatingInvoice ? 'Generating…' : 'Generate invoice' }}
                 </button>
-                <button
-                    class="bg-red-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-red-700"
-                    @click="handleCancel"
+                <p v-else class="text-sm text-gray-500">
+                    Invoice generation is available after the current billing period ends ({{
+                        formatDate(sub.current_period_end)
+                    }}).
+                </p>
+                <template v-if="sub.status === 'active'">
+                    <button
+                        class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700"
+                        @click="showChangePlan = !showChangePlan"
+                    >
+                        Change Plan
+                    </button>
+                    <button
+                        class="bg-red-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-red-700"
+                        @click="handleCancel"
+                    >
+                        Cancel Subscription
+                    </button>
+                </template>
+            </div>
+
+            <div
+                v-if="invoiceSuccessId"
+                class="rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+            >
+                Invoice created.
+                <router-link
+                    :to="{ name: 'invoices.show', params: { id: invoiceSuccessId } }"
+                    class="font-medium text-green-900 underline"
                 >
-                    Cancel Subscription
-                </button>
+                    View invoice
+                </router-link>
             </div>
 
             <div v-if="showChangePlan" class="bg-white shadow rounded-lg p-6 max-w-md">
@@ -165,7 +193,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import axios from 'axios';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import * as subsApi from '@/api/subscriptions';
@@ -183,6 +212,13 @@ const error = ref<string | null>(null);
 const showChangePlan = ref(false);
 const targetPlanId = ref('');
 const changing = ref(false);
+const generatingInvoice = ref(false);
+const invoiceSuccessId = ref<string | null>(null);
+
+const billingPeriodEnded = computed(() => {
+    if (!sub.value?.current_period_end) return false;
+    return new Date(sub.value.current_period_end).getTime() <= Date.now();
+});
 
 function formatMoney(paise: number): string {
     return '₹' + (paise / 100).toFixed(2);
@@ -227,6 +263,27 @@ async function handleCancel() {
         await loadSubscription();
     } catch {
         error.value = 'Failed to cancel subscription.';
+    }
+}
+
+async function handleGenerateInvoice() {
+    if (!sub.value || !confirm('Generate invoice for the current billing period?')) return;
+    generatingInvoice.value = true;
+    error.value = null;
+    invoiceSuccessId.value = null;
+    try {
+        const invoice = await subsApi.generateSubscriptionInvoice(sub.value.id);
+        invoiceSuccessId.value = invoice.id;
+    } catch (e) {
+        if (axios.isAxiosError(e) && e.response?.status === 422) {
+            const errors = e.response.data?.errors as Record<string, string[]> | undefined;
+            error.value =
+                errors?.subscription?.[0] ?? 'Cannot generate invoice for this subscription.';
+        } else {
+            error.value = 'Failed to generate invoice.';
+        }
+    } finally {
+        generatingInvoice.value = false;
     }
 }
 

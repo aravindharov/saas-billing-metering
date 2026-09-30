@@ -43,6 +43,8 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             ->name('subscriptions.change-plan');
         Route::post('/subscriptions/{subscription}/cancel', [SubscriptionController::class, 'cancel'])
             ->name('subscriptions.cancel');
+        Route::post('/subscriptions/{subscription}/generate-invoice', [SubscriptionController::class, 'generateInvoice'])
+            ->name('subscriptions.generate-invoice');
 
         Route::post('/usage', [UsageController::class, 'store'])
             ->middleware('throttle:usage-ingest')

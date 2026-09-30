@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Billing\GenerateInvoice;
 use App\Actions\Subscriptions\CancelSubscription;
 use App\Actions\Subscriptions\ChangeSubscriptionPlan;
 use App\Actions\Subscriptions\CreateSubscription;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ChangePlanRequest;
 use App\Http\Requests\StoreSubscriptionRequest;
+use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\SubscriptionPlanChangeResource;
 use App\Http\Resources\SubscriptionResource;
 use App\Models\Customer;
@@ -137,5 +139,17 @@ final class SubscriptionController extends Controller
         $subscription->load(['customer', 'plan', 'planChanges']);
 
         return new SubscriptionResource($subscription);
+    }
+
+    public function generateInvoice(Subscription $subscription, GenerateInvoice $action): JsonResponse
+    {
+        Gate::authorize('generateInvoice', $subscription);
+
+        $invoice = $action->execute($subscription);
+        $invoice->load(['customer', 'subscription.plan', 'lines']);
+
+        return (new InvoiceResource($invoice))
+            ->response()
+            ->setStatusCode(200);
     }
 }

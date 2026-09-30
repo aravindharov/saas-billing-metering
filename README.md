@@ -648,7 +648,7 @@ Both owners and members may view daily usage (`viewDailyUsage` on `UsageEventPol
 
 ## Phase 7 — Billing & Invoices
 
-Cycle-end invoices are generated server-side (`GenerateInvoice`, `billing:generate-invoices`). The API is read-only.
+Cycle-end invoices are generated server-side (`GenerateInvoice`, `billing:generate-invoices`). Owners can also trigger generation from the subscription detail UI or via `POST /api/v1/subscriptions/{subscription}/generate-invoice` (idempotent, ended period only).
 
 ### Invoice API
 

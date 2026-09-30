@@ -1,4 +1,5 @@
 import client from './client';
+import type { InvoiceData } from '@/types/invoices';
 import type { SubscriptionData, SubscriptionPlanChange } from '@/types/subscriptions';
 import type { PaginatedResponse } from '@/types/plans';
 
@@ -46,6 +47,13 @@ export async function changePlan(
 export async function cancelSubscription(id: string): Promise<SubscriptionData> {
     const { data } = await client.post<{ data: SubscriptionData }>(
         `/v1/subscriptions/${id}/cancel`,
+    );
+    return data.data;
+}
+
+export async function generateSubscriptionInvoice(subscriptionId: string): Promise<InvoiceData> {
+    const { data } = await client.post<{ data: InvoiceData }>(
+        `/v1/subscriptions/${subscriptionId}/generate-invoice`,
     );
     return data.data;
 }
