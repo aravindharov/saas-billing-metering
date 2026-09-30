@@ -13,6 +13,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Aggregate raw usage events into a daily usage read model.
@@ -65,5 +67,15 @@ final class AggregateDailyUsage implements ShouldQueue
                 ->where('usage_date', $this->usageDate)
                 ->delete();
         }
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::warning('aggregation.daily_usage_failed', [
+            'merchant_id' => $this->merchantId,
+            'customer_id' => $this->customerId,
+            'usage_date' => $this->usageDate,
+            'message' => $exception->getMessage(),
+        ]);
     }
 }

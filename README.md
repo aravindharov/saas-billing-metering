@@ -3,7 +3,9 @@
 A multi-tenant SaaS backend that supports merchants, plans, customer
 subscriptions, usage-event ingestion, aggregation, and invoice generation.
 
-> **Current phase: 6 — Daily Usage Aggregation**
+> **Current phase: 9 — Performance, Security & Production Hardening**
+
+Architecture, 50L+ usage strategy, indexes, caching, and idempotency: **[docs/architecture.md](docs/architecture.md)**.
 
 ---
 
@@ -1100,8 +1102,41 @@ Implemented via `UsageEventPolicy::viewDailyUsage`.
 - [x] Vue home dashboard with summary cards, tables, loading/empty/error states
 - [x] Backend + frontend tests; no raw `usage_events` scans on dashboard path
 
-### 🔲 Planned
+### ✅ Implemented (Phase 9 — Performance & Security Hardening)
 
-- [ ] Rate limiting on ingestion endpoints
-- [ ] Optional short-TTL dashboard cache
-- [ ] Payment processing & credit notes (out of assignment scope)
+- [x] Architecture doc: 50L+ pipeline, indexes, chunking, queues, partitioning deferral
+- [x] Aggregation index `(merchant_id, customer_id, occurred_at)` on `usage_events`
+- [x] Cross-tenant security regression tests (plans, customers, subscriptions, invoices, dashboard)
+- [x] Input hardening tests (untrusted `merchant_id`, subscription pricing snapshot)
+- [x] Lightweight logging on duplicate usage, aggregation/billing job failures
+- [x] Production notes (`APP_DEBUG=false`) in `.env.example`
+
+### 🔲 Out of assignment scope
+
+- [ ] Payment processing, refunds, credit notes, dunning, taxes
+- [ ] Optional dashboard response cache
+- [ ] Database partitioning (documented as future — see `docs/architecture.md`)
+
+---
+
+## Assignment requirement checklist
+
+| Requirement | Status |
+|-------------|--------|
+| Plans | ✅ |
+| Customers | ✅ |
+| Subscriptions | ✅ |
+| Usage events + `POST /usage` | ✅ |
+| Idempotency (`event_id` + DB unique) | ✅ |
+| Rate limiting (500/min/merchant) | ✅ |
+| High-volume / 50L+ strategy | ✅ [docs/architecture.md](docs/architecture.md) |
+| Daily aggregation | ✅ |
+| Billing + overage + proration | ✅ |
+| Mid-cycle plan changes + historical pricing | ✅ |
+| Invoice generation + idempotency | ✅ |
+| Dashboard (top 5, projected overage, >50% drop) | ✅ |
+| Tenant isolation | ✅ |
+| Plan caching (merchant-scoped) | ✅ |
+| Tests + static analysis | ✅ CI |
+| Documentation | ✅ README, assumptions, architecture |
+| AI prompt log | ✅ [prompts/](prompts/) |
