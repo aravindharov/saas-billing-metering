@@ -78,6 +78,16 @@ const routes: RouteRecordRaw[] = [
                 name: 'usage.record',
                 component: () => import('@/pages/RecordUsagePage.vue'),
             },
+            {
+                path: 'invoices',
+                name: 'invoices.index',
+                component: () => import('@/pages/InvoicesPage.vue'),
+            },
+            {
+                path: 'invoices/:id',
+                name: 'invoices.show',
+                component: () => import('@/pages/InvoiceDetailPage.vue'),
+            },
         ],
     },
 ];

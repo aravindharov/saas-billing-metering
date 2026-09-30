@@ -37,6 +37,12 @@
                         >
                             Usage
                         </router-link>
+                        <router-link
+                            :to="{ name: 'invoices.index' }"
+                            class="text-gray-600 hover:text-gray-900"
+                        >
+                            Invoices
+                        </router-link>
                     </nav>
                 </div>
                 <div v-if="user" class="flex items-center gap-4 text-sm">

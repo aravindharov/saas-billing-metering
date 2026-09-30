@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageEvent;
 use App\Policies\CustomerPolicy;
+use App\Policies\InvoicePolicy;
 use App\Policies\PlanPolicy;
 use App\Policies\SubscriptionPolicy;
 use App\Policies\UsageEventPolicy;
@@ -34,6 +36,7 @@ final class AppServiceProvider extends ServiceProvider
         Gate::policy(Plan::class, PlanPolicy::class);
         Gate::policy(Customer::class, CustomerPolicy::class);
         Gate::policy(Subscription::class, SubscriptionPolicy::class);
+        Gate::policy(Invoice::class, InvoicePolicy::class);
         Gate::policy(UsageEvent::class, UsageEventPolicy::class);
 
         // Merchant-scoped rate limit for usage ingestion.
