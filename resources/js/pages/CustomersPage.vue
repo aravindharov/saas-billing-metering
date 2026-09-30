@@ -1,27 +1,28 @@
 <template>
-    <div>
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-800">Customers</h2>
-            <router-link
-                v-if="isOwner"
-                :to="{ name: 'customers.create' }"
-                class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700"
-            >
-                Create Customer
-            </router-link>
-        </div>
+    <div class="ui-page">
+        <UiPageHeader title="Customers">
+            <template #actions>
+                <router-link
+                    v-if="isOwner"
+                    :to="{ name: 'customers.create' }"
+                    class="ui-btn-primary"
+                >
+                    Create Customer
+                </router-link>
+            </template>
+        </UiPageHeader>
 
-        <div class="flex items-center gap-3 mb-4">
+        <div class="ui-toolbar">
             <input
                 v-model="searchQuery"
-                type="text"
+                type="search"
                 placeholder="Search by name, email, or reference…"
-                class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="ui-input min-w-[12rem] flex-1"
                 @input="debouncedSearch"
             />
             <select
                 v-model="statusFilter"
-                class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="ui-select w-auto min-w-[10rem]"
                 @change="loadCustomers(1)"
             >
                 <option value="">All statuses</option>
@@ -30,91 +31,56 @@
             </select>
         </div>
 
-        <div
-            v-if="error"
-            class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4"
-        >
-            {{ error }}
-        </div>
+        <UiAlert v-if="error">{{ error }}</UiAlert>
+        <UiLoading v-if="loading" message="Loading customers…" />
+        <UiEmpty
+            v-else-if="customers.length === 0"
+            title="No customers found"
+            message="No customers found."
+        />
 
-        <div v-if="loading" class="text-gray-500 text-sm">Loading customers…</div>
-
-        <div v-else-if="customers.length === 0" class="text-gray-500 text-sm">
-            No customers found.
-        </div>
-
-        <div v-else>
-            <div class="bg-white shadow rounded-lg overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+        <template v-else>
+            <div class="ui-table-wrap">
+                <table class="ui-table">
+                    <thead>
                         <tr>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Name
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Email
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Reference
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Status
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Created
-                            </th>
-                            <th
-                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"
-                            >
-                                Actions
-                            </th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Reference</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody>
                         <tr v-for="customer in customers" :key="customer.id">
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">
-                                {{ customer.name }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">{{ customer.email }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
+                            <td class="ui-table-primary">{{ customer.name }}</td>
+                            <td>{{ customer.email }}</td>
+                            <td class="text-slate-500">
                                 {{ customer.external_reference ?? '—' }}
                             </td>
-                            <td class="px-6 py-4 text-sm">
-                                <span
-                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                    :class="
-                                        customer.status === 'active'
-                                            ? 'bg-green-100 text-green-800'
-                                            : 'bg-gray-100 text-gray-800'
-                                    "
+                            <td>
+                                <UiBadge
+                                    :variant="customer.status === 'active' ? 'success' : 'neutral'"
                                 >
                                     {{ customer.status }}
-                                </span>
+                                </UiBadge>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
+                            <td class="text-slate-500">
                                 {{ new Date(customer.created_at).toLocaleDateString() }}
                             </td>
-                            <td class="px-6 py-4 text-sm space-x-2">
+                            <td class="space-x-3 whitespace-nowrap">
                                 <router-link
                                     :to="{ name: 'customers.edit', params: { id: customer.id } }"
-                                    class="text-blue-600 hover:text-blue-800"
+                                    class="ui-link"
                                     :class="{ 'pointer-events-none opacity-50': !isOwner }"
                                 >
                                     Edit
                                 </router-link>
                                 <button
                                     v-if="isOwner && customer.status === 'active'"
-                                    class="text-red-600 hover:text-red-800"
+                                    type="button"
+                                    class="ui-btn-danger px-0 py-0"
                                     @click="confirmDeactivate(customer)"
                                 >
                                     Deactivate
@@ -125,39 +91,19 @@
                 </table>
             </div>
 
-            <div
-                v-if="meta && meta.last_page > 1"
-                class="flex items-center justify-between mt-4 text-sm text-gray-600"
-            >
-                <span
-                    >Page {{ meta.current_page }} of {{ meta.last_page }} ({{
-                        meta.total
-                    }}
-                    customers)</span
-                >
-                <div class="space-x-2">
-                    <button
-                        :disabled="meta.current_page <= 1"
-                        class="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                        @click="loadCustomers(meta.current_page - 1)"
-                    >
-                        Previous
-                    </button>
-                    <button
-                        :disabled="meta.current_page >= meta.last_page"
-                        class="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                        @click="loadCustomers(meta.current_page + 1)"
-                    >
-                        Next
-                    </button>
-                </div>
-            </div>
-        </div>
+            <UiPagination :meta="meta" label="customers" @change="loadCustomers" />
+        </template>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import UiAlert from '@/components/UiAlert.vue';
+import UiBadge from '@/components/UiBadge.vue';
+import UiEmpty from '@/components/UiEmpty.vue';
+import UiLoading from '@/components/UiLoading.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
+import UiPagination from '@/components/UiPagination.vue';
 import { useAuth } from '@/composables/useAuth';
 import * as customersApi from '@/api/customers';
 import type { Customer } from '@/types/customers';

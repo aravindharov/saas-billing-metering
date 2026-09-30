@@ -1,47 +1,31 @@
 <template>
-    <div>
-        <div class="mb-6 flex items-center justify-between">
-            <h2 class="text-2xl font-bold text-gray-800">Record Usage</h2>
-            <router-link
-                :to="{ name: 'usage.daily' }"
-                class="text-sm text-gray-600 hover:text-gray-800"
-            >
-                ← Daily totals
-            </router-link>
-        </div>
+    <div class="ui-page">
+        <UiPageHeader
+            title="Record Usage"
+            description="Submit a usage event for an active customer subscription."
+        >
+            <template #actions>
+                <router-link :to="{ name: 'usage.daily' }" class="ui-link-muted">
+                    ← Daily totals
+                </router-link>
+            </template>
+        </UiPageHeader>
 
-        <p class="mb-4 max-w-lg text-sm text-gray-600">
-            Submit a usage event for an active customer subscription. Each event needs a unique
-            <code class="rounded bg-gray-100 px-1">event_id</code> (retries with the same id are
-            ignored).
+        <p class="max-w-xl text-sm text-slate-600">
+            Each event needs a unique <code>event_id</code> (retries with the same id are ignored).
         </p>
 
-        <form
-            class="max-w-lg space-y-4 rounded-lg bg-white px-8 py-6 shadow"
-            @submit.prevent="handleSubmit"
-        >
-            <div
-                v-if="error"
-                class="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-            >
-                {{ error }}
-            </div>
-            <div
-                v-if="success"
-                class="rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
-            >
-                {{ success }}
-            </div>
+        <form class="ui-form" @submit.prevent="handleSubmit">
+            <UiAlert v-if="error">{{ error }}</UiAlert>
+            <UiAlert v-if="success" variant="success">{{ success }}</UiAlert>
 
             <div>
-                <label for="customer_id" class="mb-1 block text-sm font-medium text-gray-700"
-                    >Customer</label
-                >
+                <label for="customer_id" class="ui-label">Customer</label>
                 <select
                     id="customer_id"
                     v-model="form.customer_id"
                     required
-                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-select"
                     @change="onCustomerChange"
                 >
                     <option value="">Select a customer…</option>
@@ -52,15 +36,13 @@
             </div>
 
             <div>
-                <label for="subscription_id" class="mb-1 block text-sm font-medium text-gray-700"
-                    >Subscription</label
-                >
+                <label for="subscription_id" class="ui-label">Subscription</label>
                 <select
                     id="subscription_id"
                     v-model="form.subscription_id"
                     required
                     :disabled="!form.customer_id || loadingSubscriptions"
-                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    class="ui-select"
                 >
                     <option value="">
                         {{
@@ -78,9 +60,7 @@
             </div>
 
             <div>
-                <label for="event_id" class="mb-1 block text-sm font-medium text-gray-700"
-                    >Event ID</label
-                >
+                <label for="event_id" class="ui-label">Event ID</label>
                 <div class="flex gap-2">
                     <input
                         id="event_id"
@@ -88,11 +68,11 @@
                         type="text"
                         required
                         maxlength="255"
-                        class="min-w-0 flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="ui-input min-w-0 flex-1"
                     />
                     <button
                         type="button"
-                        class="shrink-0 rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+                        class="ui-btn-secondary shrink-0"
                         @click="regenerateEventId"
                     >
                         New ID
@@ -101,9 +81,7 @@
             </div>
 
             <div>
-                <label for="quantity" class="mb-1 block text-sm font-medium text-gray-700"
-                    >Quantity (units)</label
-                >
+                <label for="quantity" class="ui-label">Quantity (units)</label>
                 <input
                     id="quantity"
                     v-model.number="form.quantity"
@@ -111,37 +89,28 @@
                     min="1"
                     max="1000000"
                     required
-                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                 />
             </div>
 
             <div>
-                <label for="occurred_at" class="mb-1 block text-sm font-medium text-gray-700"
-                    >Occurred at (UTC)</label
-                >
+                <label for="occurred_at" class="ui-label">Occurred at (UTC)</label>
                 <input
                     id="occurred_at"
                     v-model="form.occurred_at"
                     type="datetime-local"
                     required
-                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                 />
             </div>
 
-            <div class="flex items-center gap-3 pt-2">
-                <button
-                    type="submit"
-                    :disabled="submitting"
-                    class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+            <div class="ui-form-actions">
+                <button type="submit" class="ui-btn-primary" :disabled="submitting">
                     {{ submitting ? 'Submitting…' : 'Record usage' }}
                 </button>
-                <router-link
-                    :to="{ name: 'usage.daily' }"
-                    class="text-sm text-gray-600 hover:text-gray-800"
+                <router-link :to="{ name: 'usage.daily' }" class="ui-link-muted"
+                    >Cancel</router-link
                 >
-                    Cancel
-                </router-link>
             </div>
         </form>
     </div>
@@ -149,6 +118,8 @@
 
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue';
+import UiAlert from '@/components/UiAlert.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
 import * as usageApi from '@/api/usage';
 import * as customersApi from '@/api/customers';
 import * as subscriptionsApi from '@/api/subscriptions';

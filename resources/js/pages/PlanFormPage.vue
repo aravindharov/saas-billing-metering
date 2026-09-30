@@ -1,117 +1,76 @@
 <template>
-    <div>
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">
-            {{ isEdit ? 'Edit Plan' : 'Create Plan' }}
-        </h2>
+    <div class="ui-page">
+        <UiPageHeader :title="isEdit ? 'Edit Plan' : 'Create Plan'" />
 
-        <div
-            v-if="loadError"
-            class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4"
-        >
-            {{ loadError }}
-        </div>
+        <UiAlert v-if="loadError">{{ loadError }}</UiAlert>
 
-        <form
-            v-else
-            class="bg-white shadow rounded-lg px-8 py-6 space-y-4 max-w-lg"
-            @submit.prevent="handleSubmit"
-        >
-            <div
-                v-if="error"
-                class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm"
-            >
-                {{ error }}
-            </div>
+        <form v-else class="ui-form" @submit.prevent="handleSubmit">
+            <UiAlert v-if="error">{{ error }}</UiAlert>
 
             <div>
-                <label for="name" class="block text-sm font-medium text-gray-700 mb-1"
-                    >Plan Name</label
-                >
+                <label for="name" class="ui-label">Plan Name</label>
                 <input
                     id="name"
                     v-model="form.name"
                     type="text"
                     required
                     maxlength="255"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                 />
             </div>
 
             <div>
-                <label for="base_price" class="block text-sm font-medium text-gray-700 mb-1">
-                    Base Price (paise)
-                </label>
+                <label for="base_price" class="ui-label">Base Price (paise)</label>
                 <input
                     id="base_price"
                     v-model.number="form.base_price"
                     type="number"
                     required
                     min="0"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                 />
-                <p class="text-xs text-gray-500 mt-1">Integer minor units. E.g. ₹499.00 = 49900</p>
+                <p class="ui-hint">Integer minor units. E.g. ₹499.00 = 49900</p>
             </div>
 
             <div>
-                <label for="billing_cycle" class="block text-sm font-medium text-gray-700 mb-1">
-                    Billing Cycle
-                </label>
-                <select
-                    id="billing_cycle"
-                    v-model="form.billing_cycle"
-                    required
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <label for="billing_cycle" class="ui-label">Billing Cycle</label>
+                <select id="billing_cycle" v-model="form.billing_cycle" required class="ui-select">
                     <option value="monthly">Monthly</option>
                     <option value="yearly">Yearly</option>
                 </select>
             </div>
 
             <div>
-                <label
-                    for="included_usage_units"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                >
-                    Included Usage Units
-                </label>
+                <label for="included_usage_units" class="ui-label">Included Usage Units</label>
                 <input
                     id="included_usage_units"
                     v-model.number="form.included_usage_units"
                     type="number"
                     required
                     min="0"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                 />
             </div>
 
             <div>
-                <label for="overage_rate" class="block text-sm font-medium text-gray-700 mb-1">
-                    Overage Rate (paise per unit)
-                </label>
+                <label for="overage_rate" class="ui-label">Overage Rate (paise per unit)</label>
                 <input
                     id="overage_rate"
                     v-model.number="form.overage_rate"
                     type="number"
                     required
                     min="0"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                 />
             </div>
 
-            <div class="flex items-center gap-3 pt-2">
-                <button
-                    type="submit"
-                    :disabled="submitting"
-                    class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+            <div class="ui-form-actions">
+                <button type="submit" class="ui-btn-primary" :disabled="submitting">
                     {{ submitting ? 'Saving…' : isEdit ? 'Update Plan' : 'Create Plan' }}
                 </button>
-                <router-link
-                    :to="{ name: 'plans.index' }"
-                    class="text-gray-600 hover:text-gray-800 text-sm"
+                <router-link :to="{ name: 'plans.index' }" class="ui-link-muted"
+                    >Cancel</router-link
                 >
-                    Cancel
-                </router-link>
             </div>
         </form>
     </div>
@@ -120,6 +79,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import UiAlert from '@/components/UiAlert.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
 import * as plansApi from '@/api/plans';
 import type { PlanFormData } from '@/types/plans';
 

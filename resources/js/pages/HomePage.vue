@@ -1,195 +1,132 @@
 <template>
-    <div>
-        <h2 class="mb-2 text-2xl font-bold text-gray-800">Usage &amp; Billing Dashboard</h2>
-        <p v-if="merchant" class="mb-6 text-sm text-gray-500">{{ merchant.name }}</p>
+    <div class="ui-page">
+        <UiPageHeader
+            title="Usage &amp; Billing Dashboard"
+            :description="merchant ? merchant.name : undefined"
+        />
 
-        <div
-            v-if="error"
-            class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
-            {{ error }}
-        </div>
+        <UiAlert v-if="error">{{ error }}</UiAlert>
 
-        <div v-if="loading" class="text-sm text-gray-500">Loading dashboard…</div>
+        <UiLoading v-if="loading" message="Loading dashboard…" />
 
         <div v-else-if="dashboard" class="space-y-6">
-            <div class="grid gap-4 sm:grid-cols-3">
-                <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                    <p class="text-xs font-medium uppercase text-gray-500">Current month usage</p>
-                    <p class="mt-2 text-2xl font-semibold text-gray-900">
+            <div class="ui-stat-grid">
+                <div class="ui-stat-card">
+                    <p class="ui-stat-label">Current month usage</p>
+                    <p class="ui-stat-value">
                         {{ formatUnits(dashboard.summary.current_month_usage_units) }}
                     </p>
-                    <p class="mt-1 text-xs text-gray-500">
-                        {{ dashboard.period.month_start }} → today (UTC)
-                    </p>
+                    <p class="ui-stat-hint">{{ dashboard.period.month_start }} → today (UTC)</p>
                 </div>
-                <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                    <p class="text-xs font-medium uppercase text-gray-500">
-                        Projected overage revenue
-                    </p>
-                    <p class="mt-2 text-2xl font-semibold text-gray-900">
+                <div class="ui-stat-card">
+                    <p class="ui-stat-label">Projected overage revenue</p>
+                    <p class="ui-stat-value">
                         {{ formatMoney(dashboard.projected_overage_revenue.amount) }}
                     </p>
-                    <p class="mt-1 text-xs text-gray-500">Estimate for active billing cycles</p>
+                    <p class="ui-stat-hint">Estimate for active billing cycles</p>
                 </div>
-                <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                    <p class="text-xs font-medium uppercase text-gray-500">Active customers</p>
-                    <p class="mt-2 text-2xl font-semibold text-gray-900">
-                        {{ dashboard.summary.active_customers }}
-                    </p>
-                    <p class="mt-1 text-xs text-gray-500">
+                <div class="ui-stat-card">
+                    <p class="ui-stat-label">Active customers</p>
+                    <p class="ui-stat-value">{{ dashboard.summary.active_customers }}</p>
+                    <p class="ui-stat-hint">
                         {{ dashboard.summary.active_subscriptions }} active subscriptions
                     </p>
                 </div>
             </div>
 
-            <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <h3 class="mb-3 text-lg font-semibold text-gray-800">Current billing cycle</h3>
-                <dl class="grid gap-2 text-sm sm:grid-cols-3">
-                    <div>
-                        <dt class="text-gray-500">Cycle start (earliest)</dt>
-                        <dd class="font-medium text-gray-900">
-                            {{ formatDateTime(dashboard.billing_cycle.period_start) }}
-                        </dd>
+            <section class="ui-card ui-card-body">
+                <h3 class="ui-card-title mb-4">Current billing cycle</h3>
+                <dl class="ui-dl-grid">
+                    <div class="ui-dl-item">
+                        <dt>Cycle start (earliest)</dt>
+                        <dd>{{ formatDateTime(dashboard.billing_cycle.period_start) }}</dd>
                     </div>
-                    <div>
-                        <dt class="text-gray-500">Cycle end (latest)</dt>
-                        <dd class="font-medium text-gray-900">
-                            {{ formatDateTime(dashboard.billing_cycle.period_end) }}
-                        </dd>
+                    <div class="ui-dl-item">
+                        <dt>Cycle end (latest)</dt>
+                        <dd>{{ formatDateTime(dashboard.billing_cycle.period_end) }}</dd>
                     </div>
-                    <div>
-                        <dt class="text-gray-500">Projected overage</dt>
-                        <dd class="font-medium text-gray-900">
-                            {{ formatMoney(dashboard.projected_overage_revenue.amount) }}
-                        </dd>
+                    <div class="ui-dl-item">
+                        <dt>Projected overage</dt>
+                        <dd>{{ formatMoney(dashboard.projected_overage_revenue.amount) }}</dd>
                     </div>
                 </dl>
-            </div>
+            </section>
 
-            <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
-                <h3 class="border-b border-gray-100 px-4 py-3 text-lg font-semibold text-gray-800">
-                    Top customers (this month)
-                </h3>
-                <div
-                    v-if="dashboard.top_customers.length === 0"
-                    class="px-4 py-6 text-sm text-gray-500"
-                >
-                    No usage recorded for the current month yet.
+            <section class="ui-card ui-card-body-flush">
+                <div class="ui-card-header">
+                    <h3 class="ui-card-title">Top customers (this month)</h3>
                 </div>
-                <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50">
+                <UiEmpty v-if="dashboard.top_customers.length === 0" title="No usage this month">
+                    No usage recorded for the current month yet.
+                </UiEmpty>
+                <table v-else class="ui-table">
+                    <thead>
                         <tr>
-                            <th
-                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Customer
-                            </th>
-                            <th
-                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Email
-                            </th>
-                            <th
-                                class="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500"
-                            >
-                                Usage
-                            </th>
+                            <th>Customer</th>
+                            <th>Email</th>
+                            <th class="ui-table-num">Usage</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody>
                         <tr v-for="row in dashboard.top_customers" :key="row.customer_id">
-                            <td class="px-4 py-2 font-medium text-gray-900">{{ row.name }}</td>
-                            <td class="px-4 py-2 text-gray-600">{{ row.email }}</td>
-                            <td class="px-4 py-2 text-right text-gray-900">
-                                {{ formatUnits(row.usage_units) }}
-                            </td>
+                            <td class="ui-table-primary">{{ row.name }}</td>
+                            <td>{{ row.email }}</td>
+                            <td class="ui-table-num">{{ formatUnits(row.usage_units) }}</td>
                         </tr>
                     </tbody>
                 </table>
-            </div>
+            </section>
 
-            <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
-                <h3 class="border-b border-gray-100 px-4 py-3 text-lg font-semibold text-gray-800">
-                    Usage drops &gt;50% month-over-month
-                </h3>
-                <div
-                    v-if="dashboard.usage_drops.length === 0"
-                    class="px-4 py-6 text-sm text-gray-500"
-                >
-                    No customers with a greater than 50% usage drop (month-to-date comparison).
+            <section class="ui-card ui-card-body-flush">
+                <div class="ui-card-header">
+                    <h3 class="ui-card-title">Usage drops &gt;50% month-over-month</h3>
                 </div>
-                <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50">
+                <UiEmpty v-if="dashboard.usage_drops.length === 0" title="No significant drops">
+                    No customers with a greater than 50% usage drop (month-to-date comparison).
+                </UiEmpty>
+                <table v-else class="ui-table">
+                    <thead>
                         <tr>
-                            <th
-                                class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500"
-                            >
-                                Customer
-                            </th>
-                            <th
-                                class="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500"
-                            >
-                                Previous
-                            </th>
-                            <th
-                                class="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500"
-                            >
-                                Current
-                            </th>
-                            <th
-                                class="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500"
-                            >
-                                Change
-                            </th>
+                            <th>Customer</th>
+                            <th class="ui-table-num">Previous</th>
+                            <th class="ui-table-num">Current</th>
+                            <th class="ui-table-num">Change</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody>
                         <tr v-for="row in dashboard.usage_drops" :key="row.customer_id">
-                            <td class="px-4 py-2 font-medium text-gray-900">{{ row.name }}</td>
-                            <td class="px-4 py-2 text-right text-gray-700">
+                            <td class="ui-table-primary">{{ row.name }}</td>
+                            <td class="ui-table-num">
                                 {{ formatUnits(row.previous_usage_units) }}
                             </td>
-                            <td class="px-4 py-2 text-right text-gray-700">
+                            <td class="ui-table-num">
                                 {{ formatUnits(row.current_usage_units) }}
                             </td>
-                            <td class="px-4 py-2 text-right font-medium text-red-700">
+                            <td class="ui-table-num font-medium text-red-700">
                                 {{ row.percentage_change }}%
                             </td>
                         </tr>
                     </tbody>
                 </table>
-            </div>
+            </section>
         </div>
 
-        <nav class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <router-link
-                :to="{ name: 'usage.daily' }"
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300"
-            >
-                <span class="font-medium text-gray-900">Usage</span>
-                <p class="mt-1 text-sm text-gray-500">Daily totals and record events</p>
+        <nav class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <router-link :to="{ name: 'usage.daily' }" class="ui-quick-link">
+                <span class="font-medium text-slate-900">Usage</span>
+                <p class="mt-1 text-sm text-slate-500">Daily totals and record events</p>
             </router-link>
-            <router-link
-                :to="{ name: 'invoices.index' }"
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300"
-            >
-                <span class="font-medium text-gray-900">Invoices</span>
-                <p class="mt-1 text-sm text-gray-500">Issued billing documents</p>
+            <router-link :to="{ name: 'invoices.index' }" class="ui-quick-link">
+                <span class="font-medium text-slate-900">Invoices</span>
+                <p class="mt-1 text-sm text-slate-500">Issued billing documents</p>
             </router-link>
-            <router-link
-                :to="{ name: 'subscriptions.index' }"
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300"
-            >
-                <span class="font-medium text-gray-900">Subscriptions</span>
-                <p class="mt-1 text-sm text-gray-500">Manage customer subscriptions</p>
+            <router-link :to="{ name: 'subscriptions.index' }" class="ui-quick-link">
+                <span class="font-medium text-slate-900">Subscriptions</span>
+                <p class="mt-1 text-sm text-slate-500">Manage customer subscriptions</p>
             </router-link>
-            <router-link
-                :to="{ name: 'customers.index' }"
-                class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300"
-            >
-                <span class="font-medium text-gray-900">Customers</span>
-                <p class="mt-1 text-sm text-gray-500">Customer directory</p>
+            <router-link :to="{ name: 'customers.index' }" class="ui-quick-link">
+                <span class="font-medium text-slate-900">Customers</span>
+                <p class="mt-1 text-sm text-slate-500">Customer directory</p>
             </router-link>
         </nav>
     </div>
@@ -197,6 +134,10 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import UiAlert from '@/components/UiAlert.vue';
+import UiEmpty from '@/components/UiEmpty.vue';
+import UiLoading from '@/components/UiLoading.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
 import { useAuth } from '@/composables/useAuth';
 import * as dashboardApi from '@/api/dashboard';
 import type { DashboardData } from '@/types/dashboard';

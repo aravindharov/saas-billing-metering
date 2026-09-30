@@ -1,86 +1,58 @@
 <template>
-    <div>
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">
-            {{ isEdit ? 'Edit Customer' : 'Create Customer' }}
-        </h2>
+    <div class="ui-page">
+        <UiPageHeader :title="isEdit ? 'Edit Customer' : 'Create Customer'" />
 
-        <div
-            v-if="loadError"
-            class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4"
-        >
-            {{ loadError }}
-        </div>
+        <UiAlert v-if="loadError">{{ loadError }}</UiAlert>
 
-        <form
-            v-else
-            class="bg-white shadow rounded-lg px-8 py-6 space-y-4 max-w-lg"
-            @submit.prevent="handleSubmit"
-        >
-            <div
-                v-if="error"
-                class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm"
-            >
-                {{ error }}
-            </div>
+        <form v-else class="ui-form" @submit.prevent="handleSubmit">
+            <UiAlert v-if="error">{{ error }}</UiAlert>
 
             <div>
-                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label for="name" class="ui-label">Name</label>
                 <input
                     id="name"
                     v-model="form.name"
                     type="text"
                     required
                     maxlength="255"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                 />
             </div>
 
             <div>
-                <label for="email" class="block text-sm font-medium text-gray-700 mb-1"
-                    >Email</label
-                >
+                <label for="email" class="ui-label">Email</label>
                 <input
                     id="email"
                     v-model="form.email"
                     type="email"
                     required
                     maxlength="255"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                 />
             </div>
 
             <div>
-                <label
-                    for="external_reference"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label for="external_reference" class="ui-label">
                     External Reference
-                    <span class="text-gray-400 font-normal">(optional)</span>
+                    <span class="font-normal text-slate-400">(optional)</span>
                 </label>
                 <input
                     id="external_reference"
                     v-model="form.external_reference"
                     type="text"
                     maxlength="255"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="ui-input"
                     placeholder="e.g. CRM-10001"
                 />
             </div>
 
-            <div class="flex items-center gap-3 pt-2">
-                <button
-                    type="submit"
-                    :disabled="submitting"
-                    class="bg-blue-600 text-white py-2 px-4 rounded font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+            <div class="ui-form-actions">
+                <button type="submit" class="ui-btn-primary" :disabled="submitting">
                     {{ submitting ? 'Saving…' : isEdit ? 'Update Customer' : 'Create Customer' }}
                 </button>
-                <router-link
-                    :to="{ name: 'customers.index' }"
-                    class="text-gray-600 hover:text-gray-800 text-sm"
+                <router-link :to="{ name: 'customers.index' }" class="ui-link-muted"
+                    >Cancel</router-link
                 >
-                    Cancel
-                </router-link>
             </div>
         </form>
     </div>
@@ -89,6 +61,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import UiAlert from '@/components/UiAlert.vue';
+import UiPageHeader from '@/components/UiPageHeader.vue';
 import * as customersApi from '@/api/customers';
 import type { CustomerFormData } from '@/types/customers';
 
